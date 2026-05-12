@@ -1,50 +1,53 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Redirect, Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
-
 function RootNavigator() {
-  const colorScheme = useColorScheme();
   const { session, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
 
   usePushNotifications(session?.user?.id);
 
+  useEffect(() => {
+    if (loading) return;
+    const inAuth = segments[0] === '(auth)';
+    if (!session && !inAuth) {
+      router.replace('/(auth)/login');
+    } else if (session && inAuth) {
+      router.replace('/(tabs)');
+    }
+  }, [session, loading]);
+
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff' }}>
         <ActivityIndicator color="#2563EB" size="large" />
       </View>
     );
   }
 
-  if (!session) {
-    return <Redirect href="/(auth)/login" />;
-  }
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    </Stack>
   );
 }
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <ThemeProvider value={DefaultTheme}>
+        <StatusBar style="dark" />
+        <RootNavigator />
+      </ThemeProvider>
     </AuthProvider>
   );
 }
