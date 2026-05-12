@@ -54,6 +54,20 @@ export function useBookings() {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
+  // Realtime subscription — auto-refetch when any booking for this user changes
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`bookings:${user.id}`)
+      .on(
+        'postgres_changes' as any,
+        { event: '*', schema: 'public', table: 'bookings', filter: `user_id=eq.${user.id}` },
+        () => fetchBookings()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, fetchBookings]);
+
   const requestUrgentCall = useCallback(async () => {
     if (!user?.id) return { success: false, error: 'Not authenticated' };
     const now = new Date();

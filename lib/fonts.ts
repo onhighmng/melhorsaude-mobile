@@ -1,0 +1,9 @@
+export const FONT_PACIFICO      = 'Pacifico_400Regular';
+export const FONT_POPPINS       = 'Poppins_400Regular';
+export const FONT_POPPINS_500   = 'Poppins_500Medium';
+export const FONT_POPPINS_600   = 'Poppins_600SemiBold';
+export const FONT_POPPINS_700   = 'Poppins_700Bold';
+export const FONT_JAKARTA       = 'PlusJakartaSans_400Regular';
+export const FONT_JAKARTA_500   = 'PlusJakartaSans_500Medium';
+export const FONT_JAKARTA_600   = 'PlusJakartaSans_600SemiBold';
+export const FONT_JAKARTA_700   = 'PlusJakartaSans_700Bold';
