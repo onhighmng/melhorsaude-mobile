@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -10,66 +10,113 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#2563EB',
-        tabBarInactiveTintColor: '#94A3B8',
+        tabBarActiveTintColor: '#ffffff',
+        tabBarInactiveTintColor: '#a3a3a3',
+        tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: '#F1F5F9',
-          borderTopWidth: 1,
-          height: 60 + insets.bottom,
-          paddingBottom: insets.bottom,
-          paddingTop: 8,
-          elevation: 0,
+          position: 'absolute',
+          bottom: 20 + (Platform.OS === 'ios' ? insets.bottom : 0),
+          left: '50%',
+          transform: [{ translateX: -112 }],
+          width: 224,
+          height: 56,
+          borderRadius: 32,
+          backgroundColor: 'rgba(255,255,255,0.96)',
+          borderTopWidth: 0,
+          elevation: 12,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 20,
+          borderWidth: 1,
+          borderColor: 'rgba(0,0,0,0.08)',
+          paddingBottom: 0,
+          paddingTop: 0,
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 2,
+        tabBarItemStyle: {
+          height: 56,
+          padding: 0,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Início',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <Ionicons
+              name={focused ? 'home' : 'home-outline'}
+              size={22}
+              color={focused ? '#ffffff' : '#a3a3a3'}
+            />
           ),
+          tabBarActiveTintColor: '#ffffff',
+          tabBarActiveBackgroundColor: '#1565C0',
+          tabBarItemStyle: {
+            height: 56,
+            borderRadius: 32,
+            margin: 0,
+          },
         }}
       />
       <Tabs.Screen
-        name="sessions"
+        name="assistente"
         options={{
-          title: 'Sessões',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={24} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <Ionicons
+              name={focused ? 'chatbubble' : 'chatbubble-outline'}
+              size={22}
+              color={focused ? '#ffffff' : '#a3a3a3'}
+            />
           ),
+          tabBarActiveBackgroundColor: '#1565C0',
+          tabBarItemStyle: {
+            height: 56,
+            borderRadius: 32,
+            margin: 0,
+          },
         }}
       />
       <Tabs.Screen
-        name="resources"
+        name="meu-espaco"
         options={{
-          title: 'Recursos',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'library' : 'library-outline'} size={24} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <Ionicons
+              name={focused ? 'grid' : 'grid-outline'}
+              size={22}
+              color={focused ? '#ffffff' : '#a3a3a3'}
+            />
           ),
+          tabBarActiveBackgroundColor: '#1565C0',
+          tabBarItemStyle: {
+            height: 56,
+            borderRadius: 32,
+            margin: 0,
+          },
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="perfil"
         options={{
-          title: 'Perfil',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <Ionicons
+              name={focused ? 'person' : 'person-outline'}
+              size={22}
+              color={focused ? '#ffffff' : '#a3a3a3'}
+            />
           ),
+          tabBarActiveBackgroundColor: '#1565C0',
+          tabBarItemStyle: {
+            height: 56,
+            borderRadius: 32,
+            margin: 0,
+          },
         }}
       />
-      {/* Hide the old explore tab */}
+      {/* Hide old tabs */}
       <Tabs.Screen name="explore" options={{ href: null }} />
+      <Tabs.Screen name="sessions" options={{ href: null }} />
+      <Tabs.Screen name="resources" options={{ href: null }} />
+      <Tabs.Screen name="profile" options={{ href: null }} />
     </Tabs>
   );
 }
