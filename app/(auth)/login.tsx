@@ -7,7 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 
-const loginBg = require('@/assets/images/login-bg.png');
+const loginBg = require('@/assets/images/login-bg.jpg');
 const logoSymbol = require('@/assets/images/logo-symbol.png');
 const logoText = require('@/assets/images/logo-text.png');
 
