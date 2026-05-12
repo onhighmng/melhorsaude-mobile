@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 16.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -20,7 +20,8 @@
   "submit": {
     "production": {
       "android": {
-        "track": "internal"
+        "track": "internal",
+        "serviceAccountKeyPath": "F:\\LJR\\onhigh management\\MS PLAYSTORE\\gen-lang-client-0210544208-1396c97c2998.json"
       }
     }
   }
