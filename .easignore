@@ -1,0 +1,13 @@
+node_modules/
+.expo/
+android/
+ios/
+../android/
+../public/
+../src/
+../dist/
+../.git/
+*.mp4
+*.mov
+*.avi
+*.webm
