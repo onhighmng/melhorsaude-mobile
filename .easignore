@@ -11,3 +11,16 @@ ios/
 *.mov
 *.avi
 *.webm
+
+# Large unused asset folders
+landing-page/
+figma/
+assets/inspo/
+assets/user-dashboard/
+pages-redesign/
+pages/
+imports/
+tests/
+
+# Loose Expo cache files in assets root
+assets/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*.png

@@ -7,13 +7,12 @@ export type ResourcePillar = 'PSYCH' | 'PHYSICAL' | 'FINANCIAL' | 'LEGAL';
 export interface Resource {
   id: string;
   title_pt: string;
-  summary_pt: string | null;
-  content_type: ResourceType;
-  pillar: ResourcePillar | null;
+  description_pt: string | null;
+  resource_type: ResourceType;
+  pillar_code: ResourcePillar | null;
   thumbnail_url: string | null;
-  video_url: string | null;
-  audio_url: string | null;
-  read_time_minutes: number | null;
+  file_url: string | null;
+  duration_minutes: number | null;
   created_at: string;
 }
 
@@ -22,11 +21,12 @@ export function useResources() {
   const [loading, setLoading] = useState(true);
 
   const fetchResources = useCallback(async () => {
-    const { data } = await (supabase.from('resources') as any)
-      .select('id, title_pt, summary_pt, content_type, pillar, thumbnail_url, video_url, audio_url, read_time_minutes, created_at')
+    const { data, error } = await (supabase.from('resources') as any)
+      .select('id, title_pt, description_pt, resource_type, pillar_code, thumbnail_url, file_url, duration_minutes, created_at')
       .eq('is_published', true)
       .order('created_at', { ascending: false })
       .limit(40);
+    if (error) console.warn('[useResources] fetch error:', error.message, error.code);
     setResources((data || []) as Resource[]);
     setLoading(false);
   }, []);

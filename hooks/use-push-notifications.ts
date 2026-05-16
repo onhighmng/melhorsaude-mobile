@@ -2,49 +2,78 @@ import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch (e) {
+  console.warn('Push notifications not available');
+}
 
 async function registerPushToken(userId: string) {
   if (Platform.OS === 'web') return;
 
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  let finalStatus = existing;
+  try {
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let finalStatus = existing;
 
-  if (existing !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
+    if (existing !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
 
-  if (finalStatus !== 'granted') return;
+    if (finalStatus !== 'granted') return;
 
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId
-    ?? Constants.easConfig?.projectId;
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId;
 
-  const tokenData = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined
-  );
-
-  const expoToken = tokenData.data;
-
-  await supabase
-    .from('push_subscriptions')
-    .upsert(
-      { user_id: userId, subscription: { expo_token: expoToken } },
-      { onConflict: 'user_id' }
+    const tokenData = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined
     );
+
+    await supabase
+      .from('push_subscriptions')
+      .upsert(
+        { user_id: userId, subscription: { expo_token: tokenData.data } },
+        { onConflict: 'user_id' }
+      );
+  } catch (error) {
+    console.warn('Push token registration failed:', error);
+  }
+}
+
+// Maps the screen value sent in notification data to an app route
+function resolveRoute(screen: string, data?: Record<string, unknown>): string {
+  switch (screen) {
+    case 'daily-pulse':
+      return '/(tabs)/';
+    case 'pulse-break': {
+      const sessionId = data?.session_id as string | undefined;
+      const interventionType = data?.intervention_type as string | undefined;
+      if (sessionId && interventionType) {
+        return `/pulse-break?session_id=${encodeURIComponent(sessionId)}&intervention_type=${encodeURIComponent(interventionType)}`;
+      }
+      return '/(tabs)/';
+    }
+    case 'weekly-pulse':
+      return '/(tabs)/?pulse=1';
+    default:
+      return '/(tabs)/';
+  }
 }
 
 export function usePushNotifications(userId: string | undefined) {
+  const router = useRouter();
   const notificationListener = useRef<ReturnType<typeof Notifications.addNotificationReceivedListener>>();
   const responseListener = useRef<ReturnType<typeof Notifications.addNotificationResponseReceivedListener>>();
 
@@ -53,17 +82,15 @@ export function usePushNotifications(userId: string | undefined) {
 
     registerPushToken(userId);
 
-    // Fires when a notification arrives while app is foregrounded
-    notificationListener.current = Notifications.addNotificationReceivedListener(() => {});
+    notificationListener.current = Notifications.addNotificationReceivedListener(() => {
+      // No-op — notification banner is shown automatically
+    });
 
-    // Fires when user taps a notification
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const screen = response.notification.request.content.data?.screen as string | undefined;
-      if (screen) {
-        // Navigation is handled by the app via expo-router
-        // The screen value matches a route: /pulse, /weekly-pulse, /pulse-break
-        console.log('Notification tapped, navigate to:', screen);
-      }
+      const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+      const screen = data?.screen as string | undefined;
+      const route = resolveRoute(screen ?? '', data);
+      router.push(route as any);
     });
 
     return () => {

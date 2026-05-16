@@ -1,0 +1,65 @@
+/* Scoped Theme for Landing Page (Compatible with Main Project Tailwind v3) */
+.landing-page-wrapper {
+  --font-size: 16px;
+  /* Converted to HSL triplets for compatibility */
+  --background: 0 0% 100%;
+  /* #ffffff */
+  --foreground: 0 0% 14.5%;
+  /* oklch(0.145 0 0) approx */
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 14.5%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 14.5%;
+  --primary: 244 73% 4%;
+  /* #030213 */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 20% 96%;
+  /* #f1f5f9 */
+  --secondary-foreground: 244 73% 4%;
+  --muted: 240 5% 96%;
+  /* #ececf0 */
+  --muted-foreground: 240 4% 46%;
+  /* #717182 */
+  --accent: 210 20% 96%;
+  /* #e9ebef */
+  --accent-foreground: 244 73% 4%;
+  --destructive: 348 83% 46%;
+  /* #d4183d */
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 240 5% 65%;
+
+  --input-background: #f3f3f5;
+  --switch-background: #cbced4;
+  --radius: 0.625rem;
+}
+
+.dark .landing-page-wrapper {
+  --background: 0 0% 14.5%;
+  --foreground: 0 0% 98.5%;
+  --card: 0 0% 14.5%;
+  --card-foreground: 0 0% 98.5%;
+  --popover: 0 0% 14.5%;
+  --popover-foreground: 0 0% 98.5%;
+  --primary: 0 0% 98.5%;
+  --primary-foreground: 0 0% 20.5%;
+  --secondary: 0 0% 27%;
+  --secondary-foreground: 0 0% 98.5%;
+  --muted: 0 0% 27%;
+  --muted-foreground: 0 0% 70.8%;
+  --accent: 0 0% 27%;
+  --accent-foreground: 0 0% 98.5%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 27%;
+  --input: 0 0% 27%;
+  --ring: 0 0% 43.9%;
+}
+
+/* Layer base adjustments if needed */
+@layer base {
+  .landing-page-wrapper * {
+    @apply border-border outline-ring/50;
+  }
+}

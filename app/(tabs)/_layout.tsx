@@ -1,13 +1,21 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Platform, Dimensions } from 'react-native';
+import { Platform, Dimensions, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { useModal } from '@/contexts/ModalContext';
 
 const TAB_WIDTH = 232;
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { width: SCREEN_WIDTH } = Dimensions.get('window');
+  const { isModalVisible } = useModal();
+  const [hideTabBar, setHideTabBar] = useState(false);
+
+  useEffect(() => {
+    setHideTabBar(isModalVisible);
+  }, [isModalVisible]);
 
   return (
     <Tabs
@@ -15,11 +23,12 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: '#ffffff',
         tabBarInactiveTintColor: '#a3a3a3',
-        tabBarShowLabel: false,
         tabBarStyle: {
           position: 'absolute',
-          bottom: 20 + (Platform.OS === 'ios' ? insets.bottom : 0),
-          left: (SCREEN_WIDTH - TAB_WIDTH) / 2,
+          bottom: hideTabBar ? -100 : (20 + (Platform.OS === 'ios' ? insets.bottom : 0)),
+          left: 0,
+          right: 0,
+          marginHorizontal: (SCREEN_WIDTH - TAB_WIDTH) / 2,
           width: TAB_WIDTH,
           height: 60,
           borderRadius: 32,
@@ -38,75 +47,76 @@ export default function TabLayout() {
         tabBarItemStyle: {
           height: 60,
           padding: 0,
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        tabBarLabelStyle: { height: 0 },
+        tabBarIconStyle: {
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={focused ? 'home' : 'home-outline'}
-              size={22}
-              color={focused ? '#ffffff' : '#a3a3a3'}
-            />
+            <View style={{
+              width: 48, height: 42, borderRadius: 24,
+              backgroundColor: focused ? '#1565C0' : 'transparent',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={focused ? '#ffffff' : '#a3a3a3'} />
+            </View>
           ),
-          tabBarActiveBackgroundColor: '#1565C0',
-          tabBarItemStyle: {
-            height: 60,
-            borderRadius: 32,
-          },
         }}
       />
       <Tabs.Screen
         name="assistente"
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={focused ? 'chatbubble' : 'chatbubble-outline'}
-              size={22}
-              color={focused ? '#ffffff' : '#a3a3a3'}
-            />
+            <View style={{
+              width: 48, height: 42, borderRadius: 24,
+              backgroundColor: focused ? '#1565C0' : 'transparent',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} size={22} color={focused ? '#ffffff' : '#a3a3a3'} />
+            </View>
           ),
-          tabBarActiveBackgroundColor: '#1565C0',
-          tabBarItemStyle: {
-            height: 60,
-            borderRadius: 32,
-          },
         }}
       />
       <Tabs.Screen
         name="meu-espaco"
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={focused ? 'grid' : 'grid-outline'}
-              size={22}
-              color={focused ? '#ffffff' : '#a3a3a3'}
-            />
+            <View style={{
+              width: 48, height: 42, borderRadius: 24,
+              backgroundColor: focused ? '#1565C0' : 'transparent',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Ionicons name={focused ? 'grid' : 'grid-outline'} size={22} color={focused ? '#ffffff' : '#a3a3a3'} />
+            </View>
           ),
-          tabBarActiveBackgroundColor: '#1565C0',
-          tabBarItemStyle: {
-            height: 60,
-            borderRadius: 32,
-          },
         }}
       />
       <Tabs.Screen
         name="perfil"
         options={{
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={focused ? 'person' : 'person-outline'}
-              size={22}
-              color={focused ? '#ffffff' : '#a3a3a3'}
-            />
+            <View style={{
+              width: 48, height: 42, borderRadius: 24,
+              backgroundColor: focused ? '#1565C0' : 'transparent',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={focused ? '#ffffff' : '#a3a3a3'} />
+            </View>
           ),
-          tabBarActiveBackgroundColor: '#1565C0',
-          tabBarItemStyle: {
-            height: 60,
-            borderRadius: 32,
-          },
         }}
       />
       {/* Hidden tabs */}

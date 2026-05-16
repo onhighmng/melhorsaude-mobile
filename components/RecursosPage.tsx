@@ -1,97 +1,103 @@
 import { useState, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Linking, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useResources, Resource, ResourcePillar, ResourceType } from '@/hooks/use-resources';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ArrowLeft, Layout, FileText, Play, Music, Clock, Library } from 'lucide-react-native';
+import { useResources, Resource } from '@/hooks/use-resources';
+import { ResourceViewer } from '@/components/ResourceViewer';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/lib/design-tokens';
 
 interface Props {
   onBack: () => void;
 }
 
-const PILLAR_FILTERS: { id: string; label: string; color: string }[] = [
-  { id: 'all',       label: 'Todos',     color: '#1565C0' },
-  { id: 'PSYCH',     label: 'Mental',    color: '#1565C0' },
-  { id: 'PHYSICAL',  label: 'Físico',    color: '#FB923C' },
-  { id: 'FINANCIAL', label: 'Finanças',  color: '#34D399' },
-  { id: 'LEGAL',     label: 'Jurídico',  color: '#F472B6' },
+const PILLAR_FILTERS = [
+  { id: 'all',       label: 'Todos',     color: COLORS.PRIMARY },
+  { id: 'PSYCH',     label: 'Mental',    color: COLORS.PILLAR_MENTAL },
+  { id: 'PHYSICAL',  label: 'Físico',    color: COLORS.PILLAR_FISICO },
+  { id: 'FINANCIAL', label: 'Finanças',  color: COLORS.PILLAR_FINANCEIRA },
+  { id: 'LEGAL',     label: 'Jurídico',  color: COLORS.PILLAR_JURIDICA },
 ];
 
-const TYPE_FILTERS: { id: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'all',     label: 'Tudo',    icon: 'grid-outline'   },
-  { id: 'article', label: 'Artigos', icon: 'document-text-outline' },
-  { id: 'video',   label: 'Vídeos',  icon: 'play-circle-outline'  },
-  { id: 'audio',   label: 'Áudio',   icon: 'musical-notes-outline' },
+const TYPE_FILTERS = [
+  { id: 'all',     label: 'Tudo' },
+  { id: 'article', label: 'Artigos' },
+  { id: 'video',   label: 'Vídeos' },
+  { id: 'audio',   label: 'Áudio' },
 ];
-
-const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  article: 'document-text',
-  video: 'play-circle',
-  audio: 'musical-notes',
-};
 
 const PILLAR_COLORS: Record<string, string> = {
-  PSYCH: '#1565C0',
-  PHYSICAL: '#FB923C',
-  FINANCIAL: '#34D399',
-  LEGAL: '#F472B6',
+  PSYCH:     COLORS.PILLAR_MENTAL,
+  PHYSICAL:  COLORS.PILLAR_FISICO,
+  FINANCIAL: COLORS.PILLAR_FINANCEIRA,
+  LEGAL:     COLORS.PILLAR_JURIDICA,
 };
 
-const fallbackBg = 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=220&fit=crop';
+const TYPE_LABELS: Record<string, string> = {
+  article: 'Artigo',
+  video:   'Vídeo',
+  audio:   'Áudio',
+};
 
-function ResourceCard({ resource }: { resource: Resource }) {
-  const color = PILLAR_COLORS[resource.pillar || ''] || '#1565C0';
+function TypeIcon({ type, size, color }: { type: string; size: number; color: string }) {
+  if (type === 'video')   return <Play   size={size} color={color} />;
+  if (type === 'audio')   return <Music  size={size} color={color} />;
+  return                         <FileText size={size} color={color} />;
+}
 
-  const handlePress = async () => {
-    const url = resource.video_url || resource.audio_url;
-    if (url) {
-      await Linking.openURL(url).catch(() => {});
-    }
-  };
+function ResourceCard({ resource, onPress }: { resource: Resource; onPress: () => void }) {
+  const color = PILLAR_COLORS[resource.pillar_code ?? ''] ?? COLORS.PRIMARY;
+  const pillarLabel = PILLAR_FILTERS.find(p => p.id === resource.pillar_code)?.label;
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={handlePress}
-      activeOpacity={0.88}
-    >
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>
       {/* Thumbnail */}
       <View style={styles.thumb}>
         {resource.thumbnail_url ? (
-          <Image source={{ uri: resource.thumbnail_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+          <Image
+            source={{ uri: resource.thumbnail_url }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+          />
         ) : (
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: color + '20', alignItems: 'center', justifyContent: 'center' }]}>
-            <Ionicons name={TYPE_ICONS[resource.content_type] || 'document-text'} size={32} color={color} />
+          <View style={[StyleSheet.absoluteFillObject, styles.thumbPlaceholder, { backgroundColor: color + '18' }]}>
+            <TypeIcon type={resource.resource_type} size={36} color={color} />
           </View>
         )}
+
+        {/* Play overlay for videos */}
+        {resource.resource_type === 'video' && resource.thumbnail_url && (
+          <View style={styles.playOverlay}>
+            <View style={styles.playCircle}>
+              <Play size={18} color="#fff" fill="#fff" />
+            </View>
+          </View>
+        )}
+
         {/* Type badge */}
         <View style={[styles.typeBadge, { backgroundColor: color }]}>
-          <Ionicons name={TYPE_ICONS[resource.content_type] || 'document-text'} size={11} color="#fff" />
-          <Text style={styles.typeBadgeText}>
-            {resource.content_type === 'article' ? 'Artigo' : resource.content_type === 'video' ? 'Vídeo' : 'Áudio'}
-          </Text>
+          <TypeIcon type={resource.resource_type} size={10} color="#fff" />
+          <Text style={styles.typeBadgeText}>{TYPE_LABELS[resource.resource_type] ?? resource.resource_type}</Text>
         </View>
       </View>
 
-      {/* Content */}
+      {/* Body */}
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={2}>{resource.title_pt}</Text>
-        {resource.summary_pt ? (
-          <Text style={styles.cardSummary} numberOfLines={2}>{resource.summary_pt}</Text>
+        {resource.description_pt ? (
+          <Text style={styles.cardDesc} numberOfLines={2}>{resource.description_pt}</Text>
         ) : null}
         <View style={styles.cardMeta}>
-          {resource.read_time_minutes ? (
+          {resource.duration_minutes ? (
             <View style={styles.metaPill}>
-              <Ionicons name="time-outline" size={12} color="#474747" />
-              <Text style={styles.metaText}>{resource.read_time_minutes} min</Text>
+              <Clock size={12} color={COLORS.TEXT_SECONDARY} />
+              <Text style={styles.metaText}>{resource.duration_minutes} min</Text>
             </View>
           ) : null}
-          {resource.pillar ? (
+          {pillarLabel ? (
             <View style={[styles.metaPill, { backgroundColor: color + '18' }]}>
-              <Text style={[styles.metaText, { color }]}>
-                {PILLAR_FILTERS.find(p => p.id === resource.pillar)?.label || resource.pillar}
-              </Text>
+              <Text style={[styles.metaText, { color }]}>{pillarLabel}</Text>
             </View>
           ) : null}
         </View>
@@ -102,16 +108,15 @@ function ResourceCard({ resource }: { resource: Resource }) {
 
 export function RecursosPage({ onBack }: Props) {
   const { resources, loading } = useResources();
-  const [pillarFilter, setPillarFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [pillarFilter, setPillarFilter] = useState('all');
+  const [typeFilter, setTypeFilter]     = useState('all');
+  const [viewing, setViewing]           = useState<Resource | null>(null);
 
-  const filtered = useMemo(() => {
-    return resources.filter((r) => {
-      const pillarOk = pillarFilter === 'all' || r.pillar === pillarFilter;
-      const typeOk = typeFilter === 'all' || r.content_type === typeFilter;
-      return pillarOk && typeOk;
-    });
-  }, [resources, pillarFilter, typeFilter]);
+  const filtered = useMemo(() => resources.filter((r) => {
+    const pillarOk = pillarFilter === 'all' || r.pillar_code === pillarFilter;
+    const typeOk   = typeFilter   === 'all' || r.resource_type === typeFilter;
+    return pillarOk && typeOk;
+  }), [resources, pillarFilter, typeFilter]);
 
   return (
     <View style={styles.container}>
@@ -120,32 +125,22 @@ export function RecursosPage({ onBack }: Props) {
         <SafeAreaView>
           <View style={styles.headerInner}>
             <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={22} color="#0a0a0a" />
+              <ArrowLeft size={22} color={COLORS.TEXT_PRIMARY} />
             </TouchableOpacity>
             <Text style={styles.title}>Recursos</Text>
             <View style={{ width: 40 }} />
           </View>
 
           {/* Pillar filters */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
             {PILLAR_FILTERS.map((f) => (
               <TouchableOpacity
                 key={f.id}
-                style={[
-                  styles.filterPill,
-                  pillarFilter === f.id && { backgroundColor: f.color },
-                ]}
+                style={[styles.filterPill, pillarFilter === f.id && { backgroundColor: f.color }]}
                 onPress={() => setPillarFilter(f.id)}
                 activeOpacity={0.8}
               >
-                <Text style={[
-                  styles.filterPillText,
-                  pillarFilter === f.id && { color: '#ffffff' },
-                ]}>
+                <Text style={[styles.filterPillText, pillarFilter === f.id && { color: '#fff' }]}>
                   {f.label}
                 </Text>
               </TouchableOpacity>
@@ -153,30 +148,19 @@ export function RecursosPage({ onBack }: Props) {
           </ScrollView>
 
           {/* Type filters */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.filterRow, { paddingBottom: 12 }]}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.filterRow, { paddingBottom: 12 }]}>
             {TYPE_FILTERS.map((f) => (
               <TouchableOpacity
                 key={f.id}
-                style={[
-                  styles.typeFilterPill,
-                  typeFilter === f.id && styles.typeFilterPillActive,
-                ]}
+                style={[styles.typeFilterPill, typeFilter === f.id && styles.typeFilterPillActive]}
                 onPress={() => setTypeFilter(f.id)}
                 activeOpacity={0.8}
               >
-                <Ionicons
-                  name={f.icon}
-                  size={14}
-                  color={typeFilter === f.id ? '#1565C0' : '#474747'}
-                />
-                <Text style={[
-                  styles.typeFilterText,
-                  typeFilter === f.id && { color: '#1565C0' },
-                ]}>
+                {f.id === 'all'     ? <Layout   size={14} color={typeFilter === f.id ? COLORS.PRIMARY : COLORS.TEXT_SECONDARY} />
+                : f.id === 'article'? <FileText size={14} color={typeFilter === f.id ? COLORS.PRIMARY : COLORS.TEXT_SECONDARY} />
+                : f.id === 'video'  ? <Play     size={14} color={typeFilter === f.id ? COLORS.PRIMARY : COLORS.TEXT_SECONDARY} />
+                :                     <Music    size={14} color={typeFilter === f.id ? COLORS.PRIMARY : COLORS.TEXT_SECONDARY} />}
+                <Text style={[styles.typeFilterText, typeFilter === f.id && { color: COLORS.PRIMARY }]}>
                   {f.label}
                 </Text>
               </TouchableOpacity>
@@ -185,98 +169,83 @@ export function RecursosPage({ onBack }: Props) {
         </SafeAreaView>
       </View>
 
+      {/* List */}
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {filtered.length === 0 ? (
+        {loading ? null : filtered.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="library-outline" size={48} color="#D1D5DB" style={{ marginBottom: 12 }} />
+            <Library size={48} color="#D1D5DB" style={{ marginBottom: 12 }} />
             <Text style={styles.emptyText}>Sem recursos para este filtro.</Text>
           </View>
         ) : (
-          filtered.map((r) => <ResourceCard key={r.id} resource={r} />)
+          filtered.map((r) => (
+            <ResourceCard key={r.id} resource={r} onPress={() => setViewing(r)} />
+          ))
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* In-app viewer */}
+      <ResourceViewer resource={viewing} onClose={() => setViewing(null)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  header: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
-    backgroundColor: '#ffffff',
-  },
+  container: { flex: 1, backgroundColor: COLORS.BG },
+  header: { borderBottomWidth: 1, borderBottomColor: COLORS.BORDER, backgroundColor: COLORS.BG },
   headerInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 12,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: SPACING.lg, paddingTop: 12, paddingBottom: 12,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f2f1ef',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 40, height: 40, borderRadius: RADIUS.full,
+    backgroundColor: COLORS.CARD, alignItems: 'center', justifyContent: 'center',
   },
-  title: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '700', color: '#0a0a0a' },
-  filterRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 8 },
-  filterPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 1000,
-    backgroundColor: '#f2f1ef',
-  },
-  filterPillText: { fontSize: 13, fontWeight: '600', color: '#474747' },
+  title: { flex: 1, textAlign: 'center', fontSize: 20, fontFamily: TYPOGRAPHY.JAKARTA_700, color: COLORS.TEXT_PRIMARY },
+  filterRow: { paddingHorizontal: SPACING.lg, gap: SPACING.sm, paddingBottom: SPACING.sm },
+  filterPill: { paddingHorizontal: SPACING.md, paddingVertical: 7, borderRadius: RADIUS.full, backgroundColor: COLORS.CARD },
+  filterPillText: { fontSize: 13, fontFamily: TYPOGRAPHY.JAKARTA_600, color: COLORS.TEXT_SECONDARY },
   typeFilterPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 1000,
-    backgroundColor: '#f2f1ef',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: SPACING.md, paddingVertical: 7,
+    borderRadius: RADIUS.full, backgroundColor: COLORS.CARD,
   },
   typeFilterPillActive: { backgroundColor: '#EFF6FF' },
-  typeFilterText: { fontSize: 13, fontWeight: '600', color: '#474747' },
-  scroll: { paddingHorizontal: 20, paddingTop: 16, gap: 16 },
+  typeFilterText: { fontSize: 13, fontFamily: TYPOGRAPHY.JAKARTA_600, color: COLORS.TEXT_SECONDARY },
+  scroll: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, gap: SPACING.lg },
   empty: { alignItems: 'center', paddingTop: 60 },
-  emptyText: { fontSize: 15, color: '#474747', textAlign: 'center' },
+  emptyText: { fontSize: 15, color: COLORS.TEXT_SECONDARY, textAlign: 'center' },
+
   card: {
-    backgroundColor: '#f2f1ef',
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: COLORS.CARD, borderRadius: RADIUS.xl,
+    overflow: 'hidden', borderWidth: 1, borderColor: COLORS.BORDER,
   },
-  thumb: { height: 160, position: 'relative', backgroundColor: '#ecece7' },
+  thumb: { height: 180, position: 'relative', backgroundColor: COLORS.CARD_EL },
+  thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  playCircle: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+    paddingLeft: 4,
+  },
   typeBadge: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 1000,
+    position: 'absolute', bottom: 10, left: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.full,
   },
-  typeBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 },
-  cardBody: { padding: 16 },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: '#0a0a0a', lineHeight: 23, marginBottom: 6 },
-  cardSummary: { fontSize: 13, color: '#474747', lineHeight: 19, marginBottom: 10 },
-  cardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  typeBadgeText: { fontSize: 10, fontFamily: TYPOGRAPHY.JAKARTA_700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 },
+  cardBody: { padding: SPACING.md },
+  cardTitle: { fontSize: 17, fontFamily: TYPOGRAPHY.JAKARTA_700, color: COLORS.TEXT_PRIMARY, lineHeight: 23, marginBottom: 6 },
+  cardDesc: { fontSize: 13, color: COLORS.TEXT_SECONDARY, lineHeight: 19, marginBottom: 10 },
+  cardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   metaPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ecece7',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 1000,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: COLORS.CARD_EL, paddingHorizontal: 10,
+    paddingVertical: 5, borderRadius: RADIUS.full,
   },
-  metaText: { fontSize: 11, fontWeight: '600', color: '#474747' },
+  metaText: { fontSize: 11, fontFamily: TYPOGRAPHY.JAKARTA_600, color: COLORS.TEXT_SECONDARY },
 });

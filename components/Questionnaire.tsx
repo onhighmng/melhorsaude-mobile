@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated,
-  ScrollView, Dimensions, SafeAreaView,
+  ScrollView, Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Question } from '@/data/questionnaireData';
 import { FONT_POPPINS, FONT_JAKARTA_700 } from '@/lib/fonts';
@@ -34,10 +35,11 @@ interface Props {
   pillarId: string;
   questions: Question[];
   onBack: () => void;
-  onComplete: () => void;
+  onComplete: (answers: number[]) => void;
 }
 
 export function Questionnaire({ pillarId, questions, onBack, onComplete }: Props) {
+  const insets = useSafeAreaInsets();
   const [currentQ, setCurrentQ] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [answers, setAnswers] = useState<number[]>([]);
@@ -70,7 +72,7 @@ export function Questionnaire({ pillarId, questions, onBack, onComplete }: Props
     if (selectedOption === null) return;
     const newAnswers = [...answers, selectedOption];
     if (isLast) {
-      onComplete();
+      onComplete(newAnswers);
       return;
     }
     animateTransition(currentQ + 1, 1, () => {
@@ -95,8 +97,7 @@ export function Questionnaire({ pillarId, questions, onBack, onComplete }: Props
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: color + '18' }]}>
-        <SafeAreaView>
+      <View style={[styles.header, { backgroundColor: color + '18', paddingTop: insets.top }]}>
           <View style={styles.headerInner}>
             <TouchableOpacity style={styles.backBtn} onPress={handleBack} activeOpacity={0.7}>
               <Ionicons name="chevron-back" size={20} color={color} />
@@ -121,7 +122,6 @@ export function Questionnaire({ pillarId, questions, onBack, onComplete }: Props
               ]}
             />
           </View>
-        </SafeAreaView>
       </View>
 
       {/* Question */}
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 2 },
-  scroll: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 120 },
+  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 120 },
   questionText: {
     fontSize: 24,
     fontFamily: FONT_POPPINS,

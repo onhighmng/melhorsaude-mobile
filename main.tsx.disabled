@@ -1,0 +1,137 @@
+
+
+import { createRoot } from "react-dom/client";
+// DISABLED: import from '@tanstack/react-query';
+import posthog from "posthog-react-native";
+import App from "./App.tsx";
+import "./index.css";
+import { APP_VERSION } from "./version";
+import { supabase } from "./lib/supabase";
+import { initSentry } from "./lib/sentry";
+import { validateEnv } from "./lib/envValidation";
+
+posthog.init(process.env.VITE_POSTHOG_KEY, {
+  api_host: process.env.VITE_POSTHOG_HOST,
+  capture_pageview: false,
+  capture_pageleave: true,
+});
+
+const VERSION_STORAGE_KEY = "app_version";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function handleVersionedBootstrap() {
+  if (typeof window === "undefined") return;
+
+  try {
+    const previousVersion = window.localStorage.getItem(VERSION_STORAGE_KEY);
+
+    if (previousVersion && previousVersion !== APP_VERSION) {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((registration) => registration.unregister());
+        });
+      }
+
+      if ("caches" in window) {
+        caches.keys().then((keys) => {
+          keys.forEach((key) => {
+            caches.delete(key);
+          });
+        });
+      }
+
+      window.sessionStorage.clear();
+
+      window.localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
+      window.location.reload();
+      return;
+    }
+  } catch (error) {
+    if (process.env.DEV) {
+      console.debug("Failed during versioned bootstrap cleanup", error);
+    }
+  }
+
+  window.localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
+}
+
+handleVersionedBootstrap();
+
+function getSupabaseProjectRef() {
+  const url = process.env.VITE_SUPABASE_URL;
+  if (!url) return null;
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.split(".")[0] || null;
+  } catch (error) {
+    if (process.env.DEV) {
+      console.debug("Unable to parse Supabase project ref", error);
+    }
+    return null;
+  }
+}
+
+async function ensureValidSupabaseSession() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const session = data?.session;
+
+    if (!session) {
+      return;
+    }
+
+    const { error } = await supabase.from("profiles").select("id").limit(1);
+    if (!error) {
+      return;
+    }
+
+    const isAuthError =
+      typeof error.message === "string" &&
+      error.message.toLowerCase().includes("jwt");
+
+    if (isAuthError || (typeof (error as any).status === "number" && (error as any).status === 401)) {
+      await supabase.auth.signOut().catch(() => {
+        // ignore sign-out failures; we'll still clear storage below
+      });
+
+      const projectRef = getSupabaseProjectRef();
+      if (projectRef) {
+        window.localStorage.removeItem(`sb-${projectRef}-auth-token`);
+      }
+
+      window.location.reload();
+    }
+  } catch (error) {
+    if (process.env.DEV) {
+      console.debug("Supabase session probe failed", error);
+    }
+  }
+}
+
+async function bootstrap() {
+  // Validate environment variables first (fail fast if misconfigured)
+  validateEnv();
+
+  // Initialize Sentry error monitoring
+  initSentry();
+
+  await ensureValidSupabaseSession();
+  createRoot(document.getElementById("root")!).render(
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  );
+}
+
+
+bootstrap();

@@ -1,0 +1,17 @@
+import imgImage from '@/assets/company-dashboard/eaf43a5a27ef5bcc503c0ad293ece5ca91f88dc0.png';
+
+function Image() {
+  return (
+    <div className="absolute h-[204.1px] left-0 top-0 w-[226.2px]" data-name="Image">
+      <img alt="" className="absolute inset-0 max-w-none object-50%-50% object-cover pointer-events-none size-full" src={imgImage} />
+    </div>
+  );
+}
+
+export default function Frame() {
+  return (
+    <div className="relative size-full">
+      <Image />
+    </div>
+  );
+}

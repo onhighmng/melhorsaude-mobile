@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -16,6 +16,7 @@ export interface Booking {
     id: string;
     profile: { full_name: string | null; avatar_url: string | null } | null;
   } | null;
+  session_feedback: { id: string }[] | null;
 }
 
 export function useBookings() {
@@ -35,16 +36,14 @@ export function useBookings() {
         .eq('user_id', user.id)
         .gte('booking_date', today)
         .in('status', ['confirmed', 'pending', 'rescheduled'])
-        .not('metadata->>request_type', 'eq', 'urgent_call')
         .order('booking_date', { ascending: true })
         .limit(10),
       (supabase.from('bookings') as any)
-        .select(`id, booking_date, start_time, end_time, status, meeting_type, primary_pillar, meeting_link, metadata, specialist:specialists(id, profile:profiles(full_name, avatar_url))`)
+        .select(`id, booking_date, start_time, end_time, status, meeting_type, primary_pillar, meeting_link, metadata, specialist:specialists(id, profile:profiles(full_name, avatar_url)), session_feedback(id)`)
         .eq('user_id', user.id)
         .eq('status', 'completed')
-        .not('metadata->>request_type', 'eq', 'urgent_call')
         .order('booking_date', { ascending: false })
-        .limit(5),
+        .limit(20),
     ]);
 
     setUpcoming((upcomingRes.data || []) as Booking[]);
@@ -54,19 +53,24 @@ export function useBookings() {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
+  // Keep a stable ref so the realtime callback always calls the latest fetch
+  // without needing to be in the effect dependency array.
+  const fetchRef = useRef(fetchBookings);
+  useEffect(() => { fetchRef.current = fetchBookings; }, [fetchBookings]);
+
   // Realtime subscription — auto-refetch when any booking for this user changes
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`bookings:${user.id}`)
+      .channel(`realtime:bookings:${user.id}`)
       .on(
         'postgres_changes' as any,
         { event: '*', schema: 'public', table: 'bookings', filter: `user_id=eq.${user.id}` },
-        () => fetchBookings()
+        () => fetchRef.current()
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id, fetchBookings]);
+  }, [user?.id]); // fetchBookings intentionally excluded — accessed via ref
 
   const requestUrgentCall = useCallback(async () => {
     if (!user?.id) return { success: false, error: 'Not authenticated' };

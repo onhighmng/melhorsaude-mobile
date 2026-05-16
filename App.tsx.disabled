@@ -1,0 +1,222 @@
+// DISABLED: import from 'react-router-dom';
+import { useEffect, lazy, Suspense } from "react";
+import posthog from "posthog-react-native";
+import { LoadingAnimation } from "@/components/LoadingAnimation";
+import { loadingAnimationConfig } from "@/components/LoadingAnimationConfig";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { useAuth } from '@/contexts/AuthContext';
+import { AppProviders } from "@/providers/AppProviders";
+
+// Eager load critical pages for faster First Meaningful Paint
+import Index from "./pages/Index";
+import AppWelcome from "./pages/AppWelcome";
+import Login from "./pages/Login";
+import UserDashboard from "./pages/dashboard/UserDashboard";
+
+// Lazy load secondary pages
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./figma/app/components/auth/ResetPassword").then(module => ({ default: module.ResetPassword })));
+const Terms = lazy(() => import("./pages/Terms"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Planner = lazy(() => import("./pages/Planner"));
+const SpecialistDashboard = lazy(() => import("./pages/SpecialistDashboard"));
+const CompanyDashboard = lazy(() => import("./pages/CompanyDashboard"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const DiagnosticPage = lazy(() => import("./pages/DiagnosticPage"));
+const TestRealtime = lazy(() => import("./pages/TestRealtime"));
+const PublicLandingPage = lazy(() => import("./pages/landing/PublicLandingPage"));
+
+
+
+const HomeDispatcher = () => {
+  const { user, loading, profile } = useAuth();
+  const navigate = useNavigate();
+
+  // Computed synchronously so there is no render where isStandalone is wrong
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    !!(window as unknown as { navigator: { standalone?: boolean } }).navigator?.standalone ||
+    document.referrer.includes('android-app://');
+
+  useEffect(() => {
+    if (loading) return;
+
+    // If logged in, redirect regardless of standalone status
+    if (user) {
+      if (profile) {
+        const role = profile.primary_role as unknown as string;
+        if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+        else if (role === 'specialist') navigate('/specialist/dashboard', { replace: true });
+        else if (role === 'company_admin') navigate('/company/dashboard', { replace: true });
+        else navigate('/user/dashboard', { replace: true });
+      } else {
+        navigate('/user/dashboard', { replace: true });
+      }
+      return;
+    }
+
+    // Only force guest redirection if in standalone mode
+    if (isStandalone) {
+      const hasSeenIntro = localStorage.getItem('hasSeenAppIntro') === 'true';
+      navigate(hasSeenIntro ? '/login' : '/app-welcome', { replace: true });
+    }
+  }, [loading, isStandalone, user, profile, navigate]);
+
+  if (loading || (isStandalone && !user)) {
+    return (
+      <LoadingAnimation
+        variant="fullscreen"
+        message="Carregando Melhor Saúde..."
+        submessage="Preparando sua experiência"
+        mascotSrc={loadingAnimationConfig.mascot}
+        wordmarkSrc={loadingAnimationConfig.wordmark}
+        primaryColor={loadingAnimationConfig.primaryColor}
+        textColor={loadingAnimationConfig.textColor}
+        showProgress={true}
+      />
+    );
+  }
+
+  return <PublicLandingPage />;
+};
+
+const AppWithTracking = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user, loading, profile } = useAuth();
+
+  // Auth Redirect for logged in users on specific pages
+  useEffect(() => {
+    if (loading) return;
+
+    const authRequiredPaths = ['/login', '/register', '/app-welcome'];
+    if (!authRequiredPaths.includes(location.pathname)) return;
+
+    if (user && profile) {
+      const role = profile.primary_role as unknown as string;
+      if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+      else if (role === 'specialist') navigate('/specialist/dashboard', { replace: true });
+      else if (role === 'company_admin') navigate('/company/dashboard', { replace: true });
+      else navigate('/user/dashboard', { replace: true });
+    } else if (user) {
+      // Authenticated but profile fetch failed — redirect to user dashboard
+      navigate('/user/dashboard', { replace: true });
+    }
+  }, [user, profile, loading, location.pathname, navigate]);
+
+
+  useEffect(() => {
+    // Ensure the viewport resets to the top on every route/navigation change.
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      if (typeof document !== "undefined") {
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    posthog.capture("$pageview");
+  }, [location.pathname, location.search]);
+
+  return (
+    <>
+      <Suspense fallback={
+        <LoadingAnimation
+          variant="fullscreen"
+          message="Carregando..."
+          submessage="Aguarde enquanto carregamos a página"
+          mascotSrc={loadingAnimationConfig.mascot}
+          wordmarkSrc={loadingAnimationConfig.wordmark}
+          primaryColor={loadingAnimationConfig.primaryColor}
+          textColor={loadingAnimationConfig.textColor}
+          showProgress={true}
+        />
+      }>
+        <Routes>
+          {/* Home page */}
+          <Route path="/" element={<HomeDispatcher />} />
+          <Route path="/index.html" element={<HomeDispatcher />} />
+          <Route path="/app-welcome" element={<AppWelcome />} />
+
+          {/* Authentication pages */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Onboarding flow */}
+          <Route path="/onboarding" element={<Onboarding />} />
+
+          {/* User Dashboard - Protected */}
+          <Route path="/user/dashboard" element={
+            <ProtectedRoute requiredRole="user">
+              <UserDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/user/planner" element={
+            <ProtectedRoute requiredRole="user">
+              <Planner />
+            </ProtectedRoute>
+          } />
+
+          {/* Specialist Dashboard - Protected */}
+          <Route path="/specialist/dashboard" element={
+            <ProtectedRoute requiredRole="specialist">
+              <SpecialistDashboard />
+            </ProtectedRoute>
+          } />
+
+          {/* Company/HR Dashboard - Protected */}
+          <Route path="/company/dashboard" element={
+            <ProtectedRoute requiredRole="company_admin">
+              <CompanyDashboard />
+            </ProtectedRoute>
+          } />
+
+          {/* Admin Dashboard - Protected */}
+          <Route path="/admin/dashboard" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
+
+
+          {/* Diagnostic Page - Requires authentication */}
+          <Route path="/diagnostic" element={
+            <ProtectedRoute requireAuth>
+              <DiagnosticPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Static pages */}
+          <Route path="/test-realtime" element={
+            <ProtectedRoute requireAuth>
+              <TestRealtime />
+            </ProtectedRoute>
+          } />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+
+          {/* Catch-all route - redirect to home */}
+          <Route path="*" element={<Index />} />
+        </Routes>
+      </Suspense>
+    </>
+  );
+};
+
+
+
+const App = () => (
+  <AppProviders>
+    <AppWithTracking />
+  </AppProviders>
+);
+
+export default App;

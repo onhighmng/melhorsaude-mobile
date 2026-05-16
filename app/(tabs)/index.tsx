@@ -1,44 +1,56 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, Alert, Modal, ActivityIndicator, Dimensions,
+  Image, Alert, Modal, ActivityIndicator, Dimensions, Animated, Easing,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useProfile } from '@/hooks/use-profile';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useModal } from '@/contexts/ModalContext';
+import { supabase } from '@/lib/supabase';
+import { track } from '@/lib/analytics';
 import { Questionnaire } from '@/components/Questionnaire';
 import { SessionBooking } from '@/components/SessionBooking';
 import { questionnaireData } from '@/data/questionnaireData';
+import { PulseCheckinScreen } from '@/components/PulseCheckinScreen';
 import { FONT_PACIFICO, FONT_POPPINS_500, FONT_JAKARTA_700 } from '@/lib/fonts';
+import { COLORS, SPACING, RADIUS, SHADOWS, GRADIENT } from '@/lib/design-tokens';
+import { usePulse } from '@/hooks/use-pulse';
+import {
+  Phone, Zap, AlertTriangle, TrendingDown, TrendingUp,
+  CheckCircle2, ArrowRight,
+} from 'lucide-react-native';
+import Svg, { Defs, ClipPath, Path as SvgPath, Image as SvgImage } from 'react-native-svg';
+
+const MOOD_INDEX: Record<string, number> = {
+  'very-sad': 1, 'bad': 2, 'neutral': 3, 'good': 4, 'great': 5,
+};
 
 const { width: SW } = Dimensions.get('window');
+const PILLAR_W = (SW - 40 - 16) / 2;
 
-const logoSymbol = require('@/assets/images/logo-symbol.png');
-const moodCardBg  = require('@/assets/images/mood-card-bg.png');
+const logoSymbol   = require('@/assets/images/logo-symbol.png');
+const moodCardBg   = require('@/assets/images/mood-card-bg.png');
 const pillarMental     = require('@/assets/images/pillar-mental.png');
 const pillarFisico     = require('@/assets/images/pillar-fisico.png');
 const pillarFinanceira = require('@/assets/images/pillar-financeira.png');
 const pillarJuridica   = require('@/assets/images/pillar-juridica.png');
 
-const CARD    = '#f2f1ef';
-const CARD_EL = '#ecece7';
-
 const PILLARS = [
-  { id: 'mental',     label: 'Saúde Mental',      sub: 'Psicológico',  image: pillarMental,     topColor: '#9dbfd4', accent: '#1565C0' },
-  { id: 'fisico',     label: 'Bem-estar',          sub: 'Físico',       image: pillarFisico,     topColor: '#fcc066', accent: '#FB923C' },
-  { id: 'financeira', label: 'Assistência',        sub: 'Financeira',   image: pillarFinanceira, topColor: '#8bbeb8', accent: '#34D399' },
-  { id: 'juridica',   label: 'Assistência',        sub: 'Jurídica',     image: pillarJuridica,   topColor: '#d8a4c4', accent: '#F472B6' },
+  { id: 'mental',     label: 'Saúde Mental',  sub: 'Psicológico',  img: pillarMental,     gradStart: '#9dbfd4', gradEnd: '#e2ecf2', accent: COLORS.PILLAR_MENTAL },
+  { id: 'fisico',     label: 'Bem-estar',      sub: 'Físico',       img: pillarFisico,     gradStart: '#fcc066', gradEnd: '#f5efe6', accent: COLORS.PILLAR_FISICO },
+  { id: 'financeira', label: 'Assistência',    sub: 'Financeira',   img: pillarFinanceira, gradStart: '#8bbeb8', gradEnd: '#dcecea', accent: COLORS.PILLAR_FINANCEIRA },
+  { id: 'juridica',   label: 'Assistência',    sub: 'Jurídica',     img: pillarJuridica,   gradStart: '#d8a4c4', gradEnd: '#f3e4ed', accent: COLORS.PILLAR_JURIDICA },
 ];
 
 const MOODS = [
-  { id: 'very-sad', emoji: '🙁', bg: '#DBEAFE', leftPct: 0.27, topPct: 0.30 },
-  { id: 'sad',      emoji: '😡', bg: '#FFE2E2', leftPct: 0.53, topPct: 0.30 },
-  { id: 'neutral',  emoji: '😐', bg: '#F3F4F6', leftPct: 0.79, topPct: 0.30 },
-  { id: 'good',     emoji: '😊', bg: '#FEF9C2', leftPct: 0.53, topPct: 0.60 },
-  { id: 'great',    emoji: '😃', bg: '#FFF085', leftPct: 0.79, topPct: 0.60 },
+  { id: 'very-sad', emoji: '🙁', bg: '#DBEAFE', leftPct: 0.26, topPct: 0.32 },
+  { id: 'bad',      emoji: '😡', bg: '#FFE2E2', leftPct: 0.52, topPct: 0.32 },
+  { id: 'neutral',  emoji: '😐', bg: '#F3F4F6', leftPct: 0.78, topPct: 0.32 },
+  { id: 'good',     emoji: '😊', bg: '#FEF9C2', leftPct: 0.52, topPct: 0.62 },
+  { id: 'great',    emoji: '😄', bg: '#FFF085', leftPct: 0.78, topPct: 0.62 },
 ];
 
 interface Specialist { id: string; name: string }
@@ -46,24 +58,59 @@ interface Specialist { id: string; name: string }
 export default function BemEstarScreen() {
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { setIsModalVisible } = useModal();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ pulse?: string }>();
+
+  const logoAnim = useRef(new Animated.Value(100)).current;
 
   const [selectedMood, setSelectedMood]   = useState<string | null>(null);
+  const [moodSaved, setMoodSaved]         = useState(false);
   const [showCallModal, setShowCallModal] = useState(false);
   const [requesting, setRequesting]       = useState(false);
   const [featuredResource, setFeaturedResource] = useState<{ title: string; thumbnail_url: string | null } | null>(null);
-  const [moodSaved, setMoodSaved]         = useState(false);
 
-  // Questionnaire / booking flow state
+  // Pillar → questionnaire → booking flow
   const [activePillar, setActivePillar]     = useState<string | null>(null);
   const [showBooking, setShowBooking]       = useState(false);
   const [specialist, setSpecialist]         = useState<Specialist>({ id: '', name: 'Especialista' });
   const [loadingSpecialist, setLoadingSpecialist] = useState(false);
+  const [questionnaireAnswers, setQuestionnaireAnswers] = useState<number[]>([]);
+
+  // Pulse check-in overlay — also opened when navigated with ?pulse=1
+  const [showPulseCheckin, setShowPulseCheckin] = useState(params.pulse === '1');
+
+  // Open pulse check-in if notification deep-link arrives while screen is mounted
+  useEffect(() => {
+    if (params.pulse === '1') setShowPulseCheckin(true);
+  }, [params.pulse]);
+
+  const { lastPulse, savePulse } = usePulse(user?.id);
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Olá';
-  const cardH = (SW - 48) * (245 / 360);
-  const moodSize = (SW - 48) * 0.155;
+
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 12) return 'Bom dia';
+    if (h >= 12 && h < 19) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
+  const cardH = (SW - 40) * (245 / 360);
+  const moodSize = (SW - 40) * 0.16;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.timing(logoAnim, {
+        toValue: 50,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [logoAnim]);
 
   useEffect(() => {
     supabase
@@ -73,24 +120,60 @@ export default function BemEstarScreen() {
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
-      .then(({ data }) => {
-        if (data) setFeaturedResource({ title: data.title_pt, thumbnail_url: data.thumbnail_url });
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('Featured resource fetch error:', error.message);
+          return;
+        }
+        if (data?.title_pt) {
+          setFeaturedResource({ title: data.title_pt, thumbnail_url: data.thumbnail_url || null });
+        }
       });
   }, []);
 
+  // Set modal visibility when entering questionnaire or booking
+  useEffect(() => {
+    if (activePillar || showBooking) {
+      setIsModalVisible(true);
+    } else {
+      setIsModalVisible(false);
+    }
+  }, [activePillar, showBooking, setIsModalVisible]);
+
+  const PILLAR_CODE: Record<string, string> = {
+    mental:     'PSYCH',
+    fisico:     'PHYSICAL',
+    financeira: 'FINANCIAL',
+    juridica:   'LEGAL',
+  };
+
   const handlePillarPress = useCallback(async (pillarId: string) => {
+    track.pillarSelected(pillarId);
     setLoadingSpecialist(true);
-    // Fetch any available specialist
+    const pillarCode = PILLAR_CODE[pillarId] ?? pillarId.toUpperCase();
+
+    // Round-robin: least recently assigned active specialist for this pillar
     const { data } = await supabase
       .from('specialists')
-      .select('id, profile:profiles(full_name)')
+      .select('id, last_assigned_at, profile:profiles(full_name), specialist_pillars!inner(pillar_code)')
+      .eq('is_active', true)
+      .eq('specialist_pillars.pillar_code', pillarCode)
+      .order('last_assigned_at', { ascending: true, nullsFirst: true })
       .limit(1)
       .maybeSingle();
+
+    if (data?.id) {
+      // Update assignment timestamp for round-robin fairness
+      supabase
+        .from('specialists')
+        .update({ last_assigned_at: new Date().toISOString() })
+        .eq('id', data.id)
+        .then(() => {});
+    }
 
     const s: Specialist = data
       ? { id: data.id, name: (data as any).profile?.full_name || 'Especialista' }
       : { id: '', name: 'Especialista' };
-
     setSpecialist(s);
     setLoadingSpecialist(false);
     setActivePillar(pillarId);
@@ -99,13 +182,21 @@ export default function BemEstarScreen() {
   const handleMoodSelect = useCallback(async (moodId: string) => {
     setSelectedMood(moodId);
     if (!user?.id) return;
-    await supabase.from('mood_logs').insert({ user_id: user.id, mood_type: moodId });
+    const moodIndex = MOOD_INDEX[moodId] ?? 3;
+    const { error } = await (supabase.from('mood_entries') as any).insert({
+      user_id: user.id,
+      mood_index: moodIndex,
+      notes: '',
+    });
+    if (error) { console.warn('[mood] insert error:', error.message); return; }
+    track.moodLogged(moodId, moodIndex);
     setMoodSaved(true);
     setTimeout(() => setMoodSaved(false), 2000);
   }, [user?.id]);
 
   const handleUrgentCall = useCallback(async () => {
     if (!user?.id) return;
+    track.urgentCallConfirmed();
     setRequesting(true);
     const now = new Date();
     const { error } = await supabase.from('bookings').insert({
@@ -116,42 +207,67 @@ export default function BemEstarScreen() {
       meeting_type: 'voice',
       primary_pillar: 'PSYCH',
       status: 'pending',
-      metadata: { request_type: 'urgent_call', notes: 'Pedido de suporte imediato via app' },
+      metadata: { request_type: 'urgent_call' },
     });
     setRequesting(false);
     setShowCallModal(false);
-    if (error) Alert.alert('Erro', error.message);
-    else Alert.alert('Pedido enviado!', 'Um especialista entrará em contacto consigo brevemente.');
+    if (error) {
+      track.urgentCallFailed(error.message);
+      Alert.alert('Erro', error.message);
+    } else {
+      Alert.alert('Pedido enviado!', 'Um especialista entrará em contacto brevemente.');
+    }
   }, [user?.id]);
 
-  // ── Questionnaire screen overlay
-  if (activePillar && !showBooking) {
-    const data = questionnaireData[activePillar];
-    if (!data) {
-      setActivePillar(null);
-      return null;
-    }
+  // ── Overlays
+  if (showPulseCheckin) {
     return (
-      <Questionnaire
-        pillarId={activePillar}
-        questions={data.questions}
-        onBack={() => setActivePillar(null)}
-        onComplete={() => setShowBooking(true)}
+      <PulseCheckinScreen
+        onBack={() => setShowPulseCheckin(false)}
+        onComplete={async (scores) => {
+          const overall = Math.round((scores.energy + scores.stress + scores.humor) / 3);
+          track.pulseCompleted(scores.energy, scores.stress, scores.humor, overall);
+          await savePulse(scores.energy, scores.stress, scores.humor);
+          setShowPulseCheckin(false);
+        }}
       />
     );
   }
 
-  // ── SessionBooking screen overlay
+  if (activePillar && !showBooking) {
+    const data = questionnaireData[activePillar];
+    if (!data) { setActivePillar(null); return null; }
+    return (
+      <Questionnaire
+        pillarId={activePillar}
+        questions={data.questions}
+        onBack={() => {
+          track.questionnaireAbandoned(activePillar);
+          setActivePillar(null);
+        }}
+        onComplete={(answers) => {
+          track.questionnaireCompleted(activePillar);
+          setQuestionnaireAnswers(answers);
+          setShowBooking(true);
+        }}
+      />
+    );
+  }
+
   if (showBooking && activePillar) {
     return (
       <SessionBooking
         pillarId={activePillar}
         specialistId={specialist.id}
         specialistName={specialist.name}
-        onBack={() => setShowBooking(false)}
+        questionnaireAnswers={questionnaireAnswers}
+        onBack={() => {
+          setShowBooking(false);
+        }}
         onConfirm={() => {
           setShowBooking(false);
           setActivePillar(null);
+          setQuestionnaireAnswers([]);
           router.push('/(tabs)/meu-espaco');
         }}
       />
@@ -159,111 +275,135 @@ export default function BemEstarScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <LinearGradient colors={GRADIENT.BG_GRADIENT.colors} start={GRADIENT.BG_GRADIENT.start} end={GRADIENT.BG_GRADIENT.end} style={s.container}>
+
       {loadingSpecialist && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator color="#1565C0" size="large" />
+        <View style={s.loadingOverlay}>
+          <ActivityIndicator color={COLORS.PRIMARY} size="large" />
         </View>
       )}
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8, paddingBottom: 120 }]}
+        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 12, paddingBottom: 130 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header: logo + notification bell */}
-        <View style={styles.topBar}>
-          <Image source={logoSymbol} style={styles.logoSymbol} resizeMode="contain" />
-          <TouchableOpacity
-            style={styles.bellBtn}
-            activeOpacity={0.8}
-            onPress={() => Alert.alert('Notificações', 'Sem notificações de momento.')}
-          >
-            <Ionicons name="notifications-outline" size={22} color="#0a0a0a" />
-          </TouchableOpacity>
+        {/* ── Logo header */}
+        <View style={s.topBar}>
+          <Animated.Image source={logoSymbol} style={[s.logo, { width: logoAnim, height: logoAnim }]} resizeMode="contain" />
         </View>
 
         {/* ── Greeting */}
-        <Text style={styles.greeting}>Olá, {firstName}! 👋</Text>
-        <Text style={styles.greetingSub}>Como estás hoje?</Text>
+        <Text style={s.greeting}>{getGreeting()}, {firstName} 👋</Text>
 
-        {/* ── PulseBar (3 stat pills) */}
-        <TouchableOpacity
-          style={styles.pulseBar}
-          activeOpacity={0.8}
-          onPress={() => Alert.alert('Pulse Semanal', 'Responde ao teu check-in semanal de bem-estar.')}
-        >
-          <View style={styles.pulsePill}>
-            <Ionicons name="moon-outline" size={14} color="#1565C0" />
-            <Text style={styles.pulsePillText}>Sono</Text>
-            <Text style={styles.pulsePillVal}>—</Text>
-          </View>
-          <View style={styles.pulseDivider} />
-          <View style={styles.pulsePill}>
-            <Ionicons name="happy-outline" size={14} color="#10B981" />
-            <Text style={styles.pulsePillText}>Humor</Text>
-            <Text style={styles.pulsePillVal}>{selectedMood ? '✓' : '—'}</Text>
-          </View>
-          <View style={styles.pulseDivider} />
-          <View style={styles.pulsePill}>
-            <Ionicons name="flame-outline" size={14} color="#FB923C" />
-            <Text style={styles.pulsePillText}>Stress</Text>
-            <Text style={styles.pulsePillVal}>—</Text>
-          </View>
-          <View style={styles.pulseArrow}>
-            <Ionicons name="chevron-forward" size={16} color="#474747" />
-          </View>
-        </TouchableOpacity>
+        {/* ── Pulse bar */}
+        <View style={s.pulseBar}>
+          {[
+            { Icon: AlertTriangle, color: '#FBBF24', label: 'Stress',  val: lastPulse ? String(lastPulse.stress)  : '—' },
+            { Icon: TrendingDown,  color: '#F87171', label: 'Energia', val: lastPulse ? String(lastPulse.energy)  : '—' },
+            { Icon: TrendingUp,    color: '#34D399', label: 'Humor',   val: lastPulse ? String(lastPulse.humor)   : '—' },
+          ].map(({ Icon, color, label, val }, i) => (
+            <View key={label} style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+              {i > 0 && <View style={s.pulseDivider} />}
+              <TouchableOpacity
+                style={s.pulsePill}
+                onPress={() => setShowPulseCheckin(true)}
+                activeOpacity={0.7}
+              >
+                <Icon color={color} size={12} strokeWidth={2.5} />
+                <Text style={s.pillVal}>{val}</Text>
+                <Text style={s.pillLabel}>{label}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
 
-        {/* ── Featured Resource (BEFORE hero mood card) */}
-        <TouchableOpacity style={styles.featuredCard} activeOpacity={0.9}>
+        {/* ── Featured resource card */}
+        <TouchableOpacity style={s.featuredCard} activeOpacity={0.9} onPress={() => track.featuredResourceTapped(featuredResource?.title ?? null)}>
           {featuredResource?.thumbnail_url ? (
             <Image source={{ uri: featuredResource.thumbnail_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
           ) : (
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#9dbfd4' }]} />
+            <LinearGradient colors={['#9dbfd4','#cde0ed']} style={StyleSheet.absoluteFillObject} />
           )}
-          <View style={styles.featuredOverlay} />
-          <View style={styles.featuredContent}>
-            <View style={styles.featuredTag}>
-              <Text style={styles.featuredTagText}>Recurso em Destaque</Text>
+          <LinearGradient
+            colors={['transparent','rgba(0,0,0,0.72)']}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={s.featuredContent}>
+            <View style={s.featuredTag}>
+              <Text style={s.featuredTagTxt}>Recurso em Destaque</Text>
             </View>
             {featuredResource?.title ? (
-              <Text style={styles.featuredTitle} numberOfLines={2}>{featuredResource.title}</Text>
+              <Text style={s.featuredTitle} numberOfLines={2}>{featuredResource.title}</Text>
             ) : null}
           </View>
         </TouchableOpacity>
 
-        {/* ── Hero Mood Card */}
-        <View style={[styles.heroCard, { height: cardH }]}>
-          <Image
-            source={moodCardBg}
-            style={[StyleSheet.absoluteFillObject, { borderRadius: 28 }]}
-            resizeMode="cover"
-          />
-          <View style={styles.heroCardOverlay} />
-          <Text style={styles.heroTitle}>Como estás a{'\n'}sentir-te hoje?</Text>
+        {/* ── Hero mood card */}
+        <View style={[s.heroCard, { height: cardH }]}>
+          {/* Sky image clipped to Figma concave shape: rounded rect with lower-left cutout */}
+          {(() => {
+            const W = SW - 40;
+            const H = cardH;
+            const cr = 24; // card corner radius
+            const pW = W * 0.38; // phone button right edge (cutout width)
+            const pY = H * 0.60; // phone button top (cutout height on left side)
+            const clipId = 'skyClip';
+            const d = [
+              `M ${cr} 0`,
+              `L ${W - cr} 0`,
+              `A ${cr} ${cr} 0 0 1 ${W} ${cr}`,
+              `L ${W} ${H - cr}`,
+              `A ${cr} ${cr} 0 0 1 ${W - cr} ${H}`,
+              `L ${pW} ${H}`,
+              `Q 0 ${H} 0 ${pY}`,
+              `L 0 ${cr}`,
+              `A ${cr} ${cr} 0 0 1 ${cr} 0`,
+              `Z`,
+            ].join(' ');
+            return (
+              <Svg width={W} height={H} style={StyleSheet.absoluteFillObject} pointerEvents="none">
+                <Defs>
+                  <ClipPath id={clipId}>
+                    <SvgPath d={d} />
+                  </ClipPath>
+                </Defs>
+                <SvgImage
+                  x={0} y={0} width={W} height={H}
+                  href={Image.resolveAssetSource(moodCardBg).uri}
+                  preserveAspectRatio="xMidYMid meet"
+                  clipPath={`url(#${clipId})`}
+                />
+              </Svg>
+            );
+          })()}
 
+          {/* "Como estás" label */}
+          <Text style={s.heroTitle}>Como estás a{'\n'}sentir-te hoje?</Text>
+
+          {/* Mood saved badge */}
           {moodSaved && (
-            <View style={styles.moodSavedBadge}>
-              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-              <Text style={styles.moodSavedText}>Humor registado!</Text>
+            <View style={s.savedBadge}>
+              <CheckCircle2 size={14} color={COLORS.SUCCESS} />
+              <Text style={s.savedTxt}>Humor registado!</Text>
             </View>
           )}
 
+          {/* Emoji mood buttons */}
           {MOODS.map((m) => (
             <TouchableOpacity
               key={m.id}
               onPress={() => handleMoodSelect(m.id)}
               activeOpacity={0.8}
               style={[
-                styles.moodBtn,
+                s.moodBtn,
                 {
                   width: moodSize,
                   height: moodSize,
-                  left: (SW - 48) * m.leftPct - moodSize / 2,
+                  left: (SW - 40) * m.leftPct,
                   top: cardH * m.topPct,
                   backgroundColor: m.bg,
                   borderWidth: selectedMood === m.id ? 2.5 : 0,
-                  borderColor: '#1565C0',
+                  borderColor: COLORS.PRIMARY,
                   transform: [{ scale: selectedMood === m.id ? 1.12 : 1 }],
                 },
               ]}
@@ -274,105 +414,104 @@ export default function BemEstarScreen() {
 
           {/* 24/7 call button */}
           <TouchableOpacity
-            onPress={() => setShowCallModal(true)}
+            onPress={() => { track.urgentCallTapped(); setShowCallModal(true); }}
             activeOpacity={0.85}
             style={[
-              styles.callBtn,
+              s.callBtn,
               {
-                left: (SW - 48) * -0.01,
-                top: cardH * 0.58,
-                height: cardH * 0.38,
-                width: (SW - 48) * 0.38,
+                left: 0,
+                top: cardH * 0.60,
+                height: cardH * 0.34,
+                width: (SW - 40) * 0.38,
               },
             ]}
           >
-            <View style={styles.callInner}>
-              <Ionicons name="call" size={moodSize * 0.42} color="#0046a2" />
-              <View style={styles.badge247}>
-                <Text style={styles.badge247Text}>24/7</Text>
+            <View style={s.callInner}>
+              <Phone size={moodSize * 0.42} color={COLORS.PRIMARY_DARK} fill={COLORS.PRIMARY_DARK} />
+              <View style={s.badge247}>
+                <Text style={s.badge247Txt}>24/7</Text>
               </View>
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* ── Pillar Grid */}
-        <Text style={styles.sectionTitle}>O teu apoio</Text>
-        <View style={styles.pillarGrid}>
+        {/* ── Section: O teu apoio */}
+        <Text style={s.sectionTitle}>O teu apoio</Text>
+
+        {/* ── Pillar grid */}
+        <View style={s.pillarGrid}>
           {PILLARS.map((p) => (
             <TouchableOpacity
               key={p.id}
+              style={s.pillarCard}
               activeOpacity={0.85}
-              style={[styles.pillarCard, { backgroundColor: p.topColor + '60' }]}
               onPress={() => handlePillarPress(p.id)}
             >
-              <Text style={styles.pillarLabel}>{p.label}</Text>
-              <Text style={styles.pillarSub}>{p.sub}</Text>
-              <Image source={p.image} style={styles.pillarImage} resizeMode="contain" />
-              <View style={[styles.pillarArrow, { backgroundColor: p.accent }]}>
-                <Ionicons name="arrow-forward" size={12} color="#fff" />
-              </View>
+              <LinearGradient
+                colors={[p.gradStart, p.gradEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <Text style={s.pillarLabel}>{p.label}</Text>
+              <Text style={s.pillarSub}>{p.sub}</Text>
+              <Image source={p.img} style={s.pillarImg} resizeMode="contain" />
             </TouchableOpacity>
           ))}
         </View>
 
         {/* ── Pulse CTA */}
         <TouchableOpacity
-          style={styles.pulseCta}
+          style={s.pulseCta}
           activeOpacity={0.85}
-          onPress={() => Alert.alert('Pulse Semanal', 'Responde ao teu check-in semanal de bem-estar.')}
+          onPress={() => setShowPulseCheckin(true)}
         >
           <View style={{ flex: 1 }}>
-            <View style={styles.ctaTag}>
-              <Text style={styles.ctaTagText}>Pulse Semanal</Text>
+            <View style={s.ctaTag}>
+              <Text style={s.ctaTagTxt}>Pulse Semanal</Text>
             </View>
-            <Text style={styles.ctaTitle}>Pronto para o teu check-in de 20s?</Text>
-            <Text style={styles.ctaSub}>Ver detalhes do teu bem-estar</Text>
+            <Text style={s.ctaTitle}>Pronto para o teu{'\n'}check-in de 20s?</Text>
+            <Text style={s.ctaSub}>Ver detalhes do teu bem-estar</Text>
           </View>
-          <View style={styles.ctaIcon}>
-            <Ionicons name="flash" size={20} color="#1565C0" />
+          <View style={s.ctaIcon}>
+            <Zap size={20} color={COLORS.PRIMARY} />
           </View>
         </TouchableOpacity>
 
-        <Text style={styles.tagline}>Cuidar das pessoas, transforma empresas</Text>
+        <Text style={s.tagline}>Cuidar das pessoas, transforma empresas</Text>
       </ScrollView>
 
-      {/* 24/7 Call Modal */}
+      {/* ── 24/7 Call modal */}
       <Modal visible={showCallModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalIconBox}>
-              <Ionicons name="call" size={28} color="#0046a2" />
+        <View style={s.overlay}>
+          <View style={s.modalBox}>
+            <View style={s.modalIcon}>
+              <Phone size={26} color={COLORS.PRIMARY_DARK} fill={COLORS.PRIMARY_DARK} />
             </View>
-            <Text style={styles.modalTitle}>Suporte 24/7</Text>
-            <Text style={styles.modalBody}>
-              Um especialista entrará em contacto consigo brevemente. Deseja confirmar o pedido?
+            <Text style={s.modalTitle}>Suporte 24/7</Text>
+            <Text style={s.modalBody}>
+              Um especialista entrará em contacto brevemente. Deseja confirmar o pedido?
             </Text>
-            <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowCallModal(false)}>
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+            <View style={s.modalBtns}>
+              <TouchableOpacity style={s.modalCancel} onPress={() => { track.urgentCallCancelled(); setShowCallModal(false); }}>
+                <Text style={s.modalCancelTxt}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalConfirm}
-                onPress={handleUrgentCall}
-                disabled={requesting}
-              >
+              <TouchableOpacity style={s.modalConfirm} onPress={handleUrgentCall} disabled={requesting}>
                 {requesting
                   ? <ActivityIndicator color="#fff" />
-                  : <Text style={styles.modalConfirmText}>Confirmar</Text>
+                  : <Text style={s.modalConfirmTxt}>Confirmar</Text>
                 }
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 }
 
-const PILLAR_CARD_W = (SW - 48 - 16) / 2;
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+const s = StyleSheet.create({
+  container: { flex: 1 },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255,255,255,0.85)',
@@ -380,251 +519,143 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 999,
   },
-  scroll: { paddingHorizontal: 24 },
+  scroll: { paddingHorizontal: 20 },
 
   // Header
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  logoSymbol: { width: 40, height: 40 },
-  bellBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f2f1ef',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
+  topBar: { alignItems: 'center', marginBottom: 20 },
+  logo: {},
   // Greeting
-  greeting: { fontSize: 30, fontFamily: FONT_PACIFICO, color: '#0a0a0a' },
-  greetingSub: { fontSize: 15, fontFamily: FONT_POPPINS_500, color: '#474747', marginTop: 4, marginBottom: 16 },
+  greetingRow: { marginBottom: 14 },
+  greetingSub: { fontSize: 14, fontFamily: FONT_POPPINS_500, color: COLORS.TEXT_SECONDARY, marginBottom: 2 },
+  greeting: { fontSize: 36, fontFamily: FONT_PACIFICO, color: COLORS.TEXT_PRIMARY, marginBottom: 14 },
 
-  // PulseBar
+  // Pulse bar
   pulseBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CARD,
-    borderRadius: 1000,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: CARD_EL,
+    borderColor: COLORS.CARD_EL,
+    marginBottom: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    ...SHADOWS.sm,
   },
   pulsePill: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, justifyContent: 'center' },
-  pulsePillText: { fontSize: 12, fontWeight: '600', color: '#474747' },
-  pulsePillVal: { fontSize: 12, fontWeight: '700', color: '#0a0a0a' },
-  pulseDivider: { width: 1, height: 18, backgroundColor: CARD_EL },
-  pulseArrow: { marginLeft: 8 },
+  pulseDivider: { width: 1, height: 18, backgroundColor: COLORS.CARD_EL },
+  pillVal: { fontSize: 12, fontFamily: FONT_JAKARTA_700, color: COLORS.TEXT_PRIMARY },
+  pillLabel: { fontSize: 10, fontFamily: FONT_POPPINS_500, color: COLORS.TEXT_SECONDARY, textTransform: 'uppercase' },
 
-  // Featured Resource
+  // Featured card
   featuredCard: {
-    height: 200,
-    borderRadius: 28,
-    overflow: 'hidden',
-    marginBottom: 20,
-    position: 'relative',
+    height: 200, borderRadius: 28, overflow: 'hidden',
+    marginBottom: 16, ...SHADOWS.lg,
   },
-  featuredOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.38)' },
   featuredContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20 },
   featuredTag: {
-    backgroundColor: '#1565C0',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 1000,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+    backgroundColor: COLORS.PRIMARY, paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: RADIUS.full, alignSelf: 'flex-start', marginBottom: 8,
   },
-  featuredTagText: { color: '#fff', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  featuredTitle: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 24 },
+  featuredTagTxt: { color: '#fff', fontSize: 10, fontFamily: FONT_JAKARTA_700, textTransform: 'uppercase', letterSpacing: 1 },
+  featuredTitle: { color: '#fff', fontSize: 18, fontFamily: FONT_JAKARTA_700, lineHeight: 24 },
 
-  // Hero Mood Card
+  // Hero mood card
   heroCard: {
-    width: '100%',
-    marginBottom: 24,
-    position: 'relative',
-    overflow: 'visible',
-    borderRadius: 28,
-  },
-  heroCardOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 28,
-    backgroundColor: 'rgba(0,0,0,0.02)',
+    width: '100%', marginBottom: 24, position: 'relative',
   },
   heroTitle: {
-    position: 'absolute',
-    left: '7%',
-    top: '8%',
-    width: '56%',
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#fff',
-    lineHeight: 26,
-    zIndex: 20,
+    position: 'absolute', left: '7%', top: '8%', width: '65%',
+    fontSize: Math.round((SW - 40) * 0.078), fontFamily: FONT_JAKARTA_700, color: '#fff', lineHeight: Math.round((SW - 40) * 0.088), zIndex: 20,
   },
-  moodSavedBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#fff',
-    borderRadius: 1000,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    zIndex: 30,
+  savedBadge: {
+    position: 'absolute', top: 12, right: 12, flexDirection: 'row',
+    alignItems: 'center', gap: 5, backgroundColor: '#fff',
+    borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 5, zIndex: 30,
   },
-  moodSavedText: { fontSize: 11, fontWeight: '700', color: '#10B981' },
+  savedTxt: { fontSize: 11, fontFamily: FONT_JAKARTA_700, color: COLORS.SUCCESS },
   moodBtn: {
-    position: 'absolute',
-    borderRadius: 1000,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    position: 'absolute', borderRadius: RADIUS.full,
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 10, ...SHADOWS.sm,
   },
   callBtn: {
-    position: 'absolute',
-    backgroundColor: '#0046a2',
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    elevation: 8,
+    position: 'absolute', backgroundColor: COLORS.PRIMARY_DARK,
+    borderRadius: RADIUS.xl, alignItems: 'center', justifyContent: 'center',
+    zIndex: 20, ...SHADOWS.lg,
   },
   callInner: {
-    width: '72%',
-    aspectRatio: 1,
-    backgroundColor: '#fff',
-    borderRadius: 1000,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    height: '72%', aspectRatio: 1, backgroundColor: '#fff',
+    borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center', position: 'relative',
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
   },
   badge247: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    backgroundColor: '#10B981',
-    borderRadius: 1000,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    position: 'absolute', top: -4, right: -8,
+    backgroundColor: COLORS.SUCCESS, borderRadius: RADIUS.full,
+    paddingHorizontal: 6, paddingVertical: 2,
   },
-  badge247Text: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  badge247Txt: { color: '#fff', fontSize: 9, fontFamily: FONT_JAKARTA_700 },
 
   // Pillars
   sectionTitle: {
-    fontSize: 24,
-    fontFamily: FONT_PACIFICO,
-    color: '#1565C0',
-    marginBottom: 16,
+    fontSize: 24, fontFamily: FONT_PACIFICO,
+    color: COLORS.PRIMARY, marginBottom: 12,
   },
   pillarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 20 },
   pillarCard: {
-    width: PILLAR_CARD_W,
-    height: 220,
-    borderRadius: 32,
-    padding: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    position: 'relative',
+    width: PILLAR_W, height: 220, borderRadius: RADIUS.xl,
+    padding: 16, overflow: 'hidden', position: 'relative',
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)', ...SHADOWS.lg,
   },
-  pillarLabel: { fontSize: 18, fontFamily: FONT_JAKARTA_700, color: '#0a0a0a', lineHeight: 22 },
-  pillarSub: { fontSize: 13, fontFamily: FONT_POPPINS_500, color: '#474747', opacity: 0.8, marginTop: 2 },
-  pillarImage: { flex: 1, width: '100%', marginTop: 8 },
+  pillarLabel: { fontSize: 18, fontFamily: FONT_JAKARTA_700, color: COLORS.TEXT_PRIMARY, lineHeight: 22 },
+  pillarSub: { fontSize: 13, fontFamily: FONT_POPPINS_500, color: COLORS.TEXT_SECONDARY, opacity: 0.8, marginTop: 2 },
+  pillarImg: { flex: 1, width: '100%', marginTop: 8 },
   pillarArrow: {
-    position: 'absolute',
-    bottom: 14,
-    right: 14,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', bottom: 14, right: 14,
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
   },
 
   // Pulse CTA
   pulseCta: {
-    borderRadius: 28,
-    padding: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: CARD_EL,
-    marginBottom: 12,
+    borderRadius: RADIUS.xl, padding: SPACING.xl,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: COLORS.CARD, marginBottom: 12,
+    borderWidth: 1, borderColor: COLORS.CARD_EL, ...SHADOWS.sm,
   },
   ctaTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-    backgroundColor: CARD_EL,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4,
+    alignSelf: 'flex-start', marginBottom: 10, backgroundColor: COLORS.CARD_EL,
   },
-  ctaTagText: { fontSize: 10, fontWeight: '700', color: '#0a0a0a', textTransform: 'uppercase', letterSpacing: 1.5 },
-  ctaTitle: { fontSize: 19, color: '#0a0a0a', lineHeight: 24, fontWeight: '400' },
-  ctaSub: { fontSize: 13, color: '#474747', fontWeight: '500', marginTop: 6, textDecorationLine: 'underline' },
+  ctaTagTxt: { fontSize: 10, fontFamily: FONT_JAKARTA_700, color: COLORS.TEXT_PRIMARY, textTransform: 'uppercase', letterSpacing: 1.5 },
+  ctaTitle: { fontSize: 19, color: COLORS.TEXT_PRIMARY, lineHeight: 24, fontFamily: FONT_POPPINS_500 },
+  ctaSub: { fontSize: 13, color: COLORS.TEXT_SECONDARY, marginTop: 6, textDecorationLine: 'underline', fontFamily: FONT_POPPINS_500 },
   ctaIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 28,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    width: 48, height: 48, borderRadius: 28, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: COLORS.CARD_EL,
   },
-  tagline: { fontSize: 13, color: '#474747', textAlign: 'center', marginBottom: 8, lineHeight: 20 },
+  tagline: { fontSize: 13, color: COLORS.TEXT_SECONDARY, textAlign: 'center', marginBottom: 12, lineHeight: 20, fontFamily: FONT_POPPINS_500 },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-  modalBox: { backgroundColor: '#fff', borderRadius: 28, padding: 28, width: SW - 64 },
-  modalIconBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    alignSelf: 'center',
+  // Call modal
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  modalBox: { backgroundColor: '#fff', borderRadius: RADIUS.xl, padding: SPACING.xl, width: SW - 64, ...SHADOWS.lg },
+  modalIcon: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 14, alignSelf: 'center',
   },
-  modalTitle: { fontSize: 22, fontWeight: '700', color: '#0a0a0a', marginBottom: 12, textAlign: 'center' },
-  modalBody: { fontSize: 15, color: '#474747', lineHeight: 22, marginBottom: 24, textAlign: 'center' },
+  modalTitle: { fontSize: 22, fontFamily: FONT_JAKARTA_700, color: COLORS.TEXT_PRIMARY, marginBottom: 10, textAlign: 'center' },
+  modalBody: { fontSize: 15, color: COLORS.TEXT_SECONDARY, lineHeight: 22, marginBottom: 24, textAlign: 'center', fontFamily: FONT_POPPINS_500 },
   modalBtns: { flexDirection: 'row', gap: 12 },
   modalCancel: {
-    flex: 1,
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1, height: 50, borderRadius: 14,
+    borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center',
   },
-  modalCancelText: { color: '#374151', fontWeight: '600', fontSize: 15 },
+  modalCancelTxt: { color: '#374151', fontFamily: FONT_JAKARTA_700, fontSize: 15 },
   modalConfirm: {
-    flex: 1,
-    height: 50,
-    borderRadius: 14,
-    backgroundColor: '#0046a2',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1, height: 50, borderRadius: 14,
+    backgroundColor: COLORS.PRIMARY_DARK, alignItems: 'center', justifyContent: 'center',
   },
-  modalConfirmText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  modalConfirmTxt: { color: '#fff', fontFamily: FONT_JAKARTA_700, fontSize: 15 },
 });

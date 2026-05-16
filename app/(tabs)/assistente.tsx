@@ -4,20 +4,18 @@ import {
   ScrollView, KeyboardAvoidingView, Platform, Animated,
   Image,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MessageCircle, Brain, Heart, Wallet, Scale, ArrowRight, Send, Bot } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT_PACIFICO, FONT_POPPINS, FONT_POPPINS_500, FONT_JAKARTA_700 } from '@/lib/fonts';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, GRADIENT } from '@/lib/design-tokens';
 
 const logoSymbol = require('@/assets/images/logo-symbol.png');
 
-const CARD    = '#f2f1ef';
-const CARD_EL = '#ecece7';
-
 const CHIPS = [
-  { icon: 'brain-outline'  as const, label: 'Não consigo desligar a cabeça' },
-  { icon: 'body-outline'   as const, label: 'Sinto o corpo todo preso' },
-  { icon: 'wallet-outline' as const, label: 'Quero organizar-me financeiramente' },
-  { icon: 'scale-outline'  as const, label: 'Sinto-me injustiçado no trabalho' },
+  { icon: 'brain' as const, label: 'Não consigo desligar a cabeça' },
+  { icon: 'heart' as const, label: 'Sinto o corpo todo preso' },
+  { icon: 'wallet' as const, label: 'Quero organizar-me financeiramente' },
+  { icon: 'scale' as const, label: 'Sinto-me injustiçado no trabalho' },
 ];
 
 const AI_RESPONSE =
@@ -117,11 +115,12 @@ export default function AssistenteScreen() {
   const isStreaming = !!streamingText;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
-    >
+    <LinearGradient colors={GRADIENT.BG_GRADIENT.colors} start={GRADIENT.BG_GRADIENT.start} end={GRADIENT.BG_GRADIENT.end} style={styles.container}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
       {/* ── Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerLeft}>
@@ -145,7 +144,7 @@ export default function AssistenteScreen() {
         {isEmpty && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconBox}>
-              <Ionicons name="chatbubble-ellipses" size={36} color="#1565C0" />
+              <MessageCircle size={36} color={COLORS.PRIMARY} />
             </View>
             <Text style={styles.emptyTitle}>Como posso ajudar-te hoje?</Text>
             <Text style={styles.emptySub}>
@@ -162,7 +161,7 @@ export default function AssistenteScreen() {
           >
             {!m.isUser && (
               <View style={styles.aiAvatar}>
-                <Ionicons name="chatbubble-ellipses" size={14} color="#1565C0" />
+                <MessageCircle size={14} color={COLORS.PRIMARY} />
               </View>
             )}
             <View style={[styles.bubble, m.isUser ? styles.bubbleUser : styles.bubbleAI]}>
@@ -177,7 +176,7 @@ export default function AssistenteScreen() {
         {isTyping && (
           <View style={[styles.bubbleRow, styles.bubbleRowAI]}>
             <View style={styles.aiAvatar}>
-              <Ionicons name="chatbubble-ellipses" size={14} color="#1565C0" />
+              <Bot size={14} color="#1565C0" />
             </View>
             <View style={[styles.bubble, styles.bubbleAI]}>
               <TypingDots />
@@ -189,7 +188,7 @@ export default function AssistenteScreen() {
         {isStreaming && (
           <View style={[styles.bubbleRow, styles.bubbleRowAI]}>
             <View style={styles.aiAvatar}>
-              <Ionicons name="chatbubble-ellipses" size={14} color="#1565C0" />
+              <Bot size={14} color="#1565C0" />
             </View>
             <View style={[styles.bubble, styles.bubbleAI]}>
               <Text style={styles.bubbleTextAI}>
@@ -204,18 +203,26 @@ export default function AssistenteScreen() {
       {/* ── Chips */}
       {showChips && isEmpty && (
         <View style={styles.chips}>
-          {CHIPS.map((c, i) => (
-            <TouchableOpacity
-              key={i}
-              style={styles.chip}
-              onPress={() => handleSubmit(c.label)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name={c.icon} size={15} color="#474747" />
-              <Text style={styles.chipText}>{c.label}</Text>
-              <Ionicons name="arrow-forward" size={14} color="#9CA3AF" />
-            </TouchableOpacity>
-          ))}
+          {CHIPS.map((c, i) => {
+            const iconMap: Record<string, React.ReactNode> = {
+              brain: <Brain size={15} color={COLORS.TEXT_SECONDARY} />,
+              heart: <Heart size={15} color={COLORS.TEXT_SECONDARY} />,
+              wallet: <Wallet size={15} color={COLORS.TEXT_SECONDARY} />,
+              scale: <Scale size={15} color={COLORS.TEXT_SECONDARY} />,
+            };
+            return (
+              <TouchableOpacity
+                key={i}
+                style={styles.chip}
+                onPress={() => handleSubmit(c.label)}
+                activeOpacity={0.8}
+              >
+                {iconMap[c.icon]}
+                <Text style={styles.chipText}>{c.label}</Text>
+                <ArrowRight size={14} color="#9CA3AF" />
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
@@ -239,15 +246,16 @@ export default function AssistenteScreen() {
           disabled={!input.trim() || isTyping || isStreaming}
           activeOpacity={0.85}
         >
-          <Ionicons name="arrow-up" size={20} color="#fff" />
+          <Send size={20} color="#fff" />
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: COLORS.BG },
 
   // Header
   header: {
@@ -256,117 +264,110 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: CARD_EL,
-    backgroundColor: '#ffffff',
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   headerLogo: { width: 40, height: 40, borderRadius: 20 },
-  headerTitle: { fontSize: 22, fontFamily: FONT_PACIFICO, color: '#0a0a0a' },
-  headerSub: { fontSize: 12, fontFamily: FONT_POPPINS_500, color: '#9CA3AF', marginTop: 1 },
-  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981' },
+  headerTitle: { fontSize: 36, fontFamily: TYPOGRAPHY.PACIFICO, color: COLORS.TEXT_PRIMARY },
+  headerSub: { fontSize: 12, fontFamily: TYPOGRAPHY.POPPINS_500, color: '#9CA3AF', marginTop: 1 },
+  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.SUCCESS },
 
   // Messages area
-  messages: { paddingHorizontal: 16, paddingTop: 20, flexGrow: 1 },
+  messages: { paddingHorizontal: SPACING.md, paddingTop: 20, flexGrow: 1 },
 
   // Empty state
-  emptyState: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 24 },
+  emptyState: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: SPACING.lg },
   emptyIconBox: {
     width: 72,
     height: 72,
-    borderRadius: 24,
+    borderRadius: RADIUS.xl,
     backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
   },
-  emptyTitle: { fontSize: 22, fontFamily: FONT_PACIFICO, color: '#0a0a0a', textAlign: 'center', marginBottom: 10 },
-  emptySub: { fontSize: 14, fontFamily: FONT_POPPINS, color: '#474747', textAlign: 'center', lineHeight: 21 },
+  emptyTitle: { fontSize: 22, fontFamily: TYPOGRAPHY.PACIFICO, color: COLORS.TEXT_PRIMARY, textAlign: 'center', marginBottom: 10 },
+  emptySub: { fontSize: 14, fontFamily: TYPOGRAPHY.POPPINS_400, color: COLORS.TEXT_SECONDARY, textAlign: 'center', lineHeight: 21 },
 
   // Bubbles
-  bubbleRow: { marginBottom: 12, flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  bubbleRow: { marginBottom: SPACING.md, flexDirection: 'row', alignItems: 'flex-end', gap: SPACING.sm },
   bubbleRowUser: { justifyContent: 'flex-end' },
   bubbleRowAI:   { justifyContent: 'flex-start' },
   aiAvatar: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.BG,
     borderWidth: 1,
-    borderColor: CARD_EL,
+    borderColor: COLORS.CARD_EL,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   bubble: {
     maxWidth: '82%',
-    padding: 14,
-    paddingHorizontal: 16,
+    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
   },
   bubbleUser: {
-    backgroundColor: '#1565C0',
-    borderRadius: 18,
+    backgroundColor: COLORS.PRIMARY,
+    borderRadius: RADIUS.lg,
     borderBottomRightRadius: 4,
+    ...SHADOWS.md,
   },
   bubbleAI: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: CARD_EL,
-    borderRadius: 18,
+    backgroundColor: COLORS.BG,
+    borderRadius: RADIUS.lg,
     borderBottomLeftRadius: 4,
+    ...SHADOWS.sm,
   },
-  bubbleText: { fontSize: 15, lineHeight: 22, fontFamily: FONT_POPPINS },
+  bubbleText: { fontSize: 15, lineHeight: 22, fontFamily: TYPOGRAPHY.POPPINS_400 },
   bubbleTextUser: { color: '#ffffff' },
-  bubbleTextAI:   { color: '#0a0a0a' },
-  cursor: { color: '#1565C0', fontWeight: '200' },
+  bubbleTextAI:   { color: COLORS.TEXT_PRIMARY },
+  cursor: { color: COLORS.PRIMARY, fontWeight: '200' },
 
   // Chips
   chips: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    gap: 8,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.sm,
+    gap: SPACING.sm,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: CARD,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: CARD_EL,
+    gap: SPACING.md,
+    backgroundColor: COLORS.CARD,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    ...SHADOWS.sm,
   },
-  chipText: { fontSize: 14, color: '#0a0a0a', fontWeight: '500', flex: 1 },
+  chipText: { fontSize: 14, color: COLORS.TEXT_PRIMARY, fontWeight: '500', flex: 1 },
 
   // Input
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACING.md,
     paddingTop: 10,
-    gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: CARD_EL,
-    backgroundColor: '#ffffff',
+    gap: SPACING.sm,
   },
   input: {
     flex: 1,
-    backgroundColor: CARD,
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    backgroundColor: COLORS.CARD,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.md,
     paddingVertical: 11,
     fontSize: 15,
-    color: '#0a0a0a',
+    color: COLORS.TEXT_PRIMARY,
     maxHeight: 120,
     borderWidth: 1,
-    borderColor: CARD_EL,
+    borderColor: COLORS.CARD_EL,
   },
   sendBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#1565C0',
+    backgroundColor: COLORS.PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
   },

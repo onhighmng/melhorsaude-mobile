@@ -1,0 +1,170 @@
+import { FlowButton } from '@/components/ui/flow-button';
+import { ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+
+interface MentalWellbeingQuestionProps {
+  onBack: () => void;
+  onNext: (selectedConcerns: number[]) => void;
+}
+
+export function MentalWellbeingQuestion({ onBack, onNext }: MentalWellbeingQuestionProps) {
+  const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
+
+  const options = [
+    {
+      text: "Tenho sentido muito stress ou ansiedade.",
+      bgColor: "bg-[#E8F4FD]",
+      hoverColor: "hover:bg-[#D4EAFC]",
+      borderColor: "border-[#4A90E2]/20",
+      textColor: "text-[#2C5282]",
+      selectedBg: "bg-[#4A90E2]",
+      selectedText: "text-white"
+    },
+    {
+      text: "Tenho dormido mal ou acordo cansado(a).",
+      bgColor: "bg-[#FFF4E6]",
+      hoverColor: "hover:bg-[#FFE8CC]",
+      borderColor: "border-[#FF9500]/20",
+      textColor: "text-[#8B5A00]",
+      selectedBg: "bg-[#FF9500]",
+      selectedText: "text-white"
+    },
+    {
+      text: "Sinto-me desmotivado(a) ou sem energia.",
+      bgColor: "bg-[#E8F9F1]",
+      hoverColor: "hover:bg-[#D1F4E0]",
+      borderColor: "border-[#34C759]/20",
+      textColor: "text-[#1E6F3F]",
+      selectedBg: "bg-[#34C759]",
+      selectedText: "text-white"
+    },
+    {
+      text: "Tenho dificuldade em equilibrar trabalho e vida pessoal.",
+      bgColor: "bg-[#F5E8FD]",
+      hoverColor: "hover:bg-[#EBDAFC]",
+      borderColor: "border-[#AF52DE]/20",
+      textColor: "text-[#6B2D9E]",
+      selectedBg: "bg-[#AF52DE]",
+      selectedText: "text-white"
+    },
+    {
+      text: "Quero falar com alguém sobre o que estou a sentir.",
+      bgColor: "bg-[#FFE8F0]",
+      hoverColor: "hover:bg-[#FFD6E7]",
+      borderColor: "border-[#FF2D55]/20",
+      textColor: "text-[#C9184A]",
+      selectedBg: "bg-[#FF2D55]",
+      selectedText: "text-white"
+    }
+  ];
+
+  const toggleOption = (index: number) => {
+    setSelectedOptions(prev => {
+      if (prev.includes(index)) {
+        return prev.filter(i => i !== index);
+      } else if (prev.length < 2) {
+        return [...prev, index];
+      }
+      return prev;
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-white flex flex-col items-center justify-between p-6 py-8">
+      <div className="flex-1 flex items-center justify-center w-full">
+        <div className="max-w-5xl w-full text-center space-y-8 px-4">
+          {/* Question */}
+          <div className="mb-4">
+            <h1 className="text-4xl md:text-5xl text-[#1D1D1F] tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>
+              O que mais tem afetado o teu bem-estar mental ultimamente?
+            </h1>
+            <p className="text-[#86868B] text-base md:text-lg mt-3" style={{ fontFamily: 'Georgia, serif' }}>
+              (escolhe até 2 opções)
+            </p>
+          </div>
+
+          {/* Options */}
+          <div className="flex flex-col items-center gap-4">
+            {/* First row - 2 options */}
+            <div className="flex flex-wrap justify-center gap-3 w-full">
+              {options.slice(0, 2).map((option, index) => {
+                const isSelected = selectedOptions.includes(index);
+                return (
+                  <button
+                    key={index}
+                    onClick={() => toggleOption(index)}
+                    className={`px-6 md:px-8 py-4 rounded-full border transition-all duration-300 text-sm md:text-lg flex-1 md:flex-initial min-w-0 ${isSelected
+                        ? `${option.selectedBg} ${option.selectedText} border-transparent`
+                        : `${option.bgColor} ${option.textColor} ${option.borderColor} ${option.hoverColor}`
+                      }`}
+                    style={{ fontFamily: 'Georgia, serif' }}
+                  >
+                    {option.text}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Second row - 1 option */}
+            <div className="flex flex-wrap justify-center gap-3 w-full">
+              {options.slice(2, 3).map((option, index) => {
+                const actualIndex = index + 2;
+                const isSelected = selectedOptions.includes(actualIndex);
+                return (
+                  <button
+                    key={actualIndex}
+                    onClick={() => toggleOption(actualIndex)}
+                    className={`px-6 md:px-8 py-4 rounded-full border transition-all duration-300 text-sm md:text-lg flex-1 md:flex-initial min-w-0 ${isSelected
+                        ? `${option.selectedBg} ${option.selectedText} border-transparent`
+                        : `${option.bgColor} ${option.textColor} ${option.borderColor} ${option.hoverColor}`
+                      }`}
+                    style={{ fontFamily: 'Georgia, serif' }}
+                  >
+                    {option.text}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Third row - 2 options */}
+            <div className="flex flex-col md:flex-row justify-center gap-3 w-full max-w-3xl">
+              {options.slice(3, 5).map((option, index) => {
+                const actualIndex = index + 3;
+                const isSelected = selectedOptions.includes(actualIndex);
+                return (
+                  <button
+                    key={actualIndex}
+                    onClick={() => toggleOption(actualIndex)}
+                    className={`px-6 md:px-8 py-4 rounded-full border transition-all duration-300 text-sm md:text-lg w-full ${isSelected
+                        ? `${option.selectedBg} ${option.selectedText} border-transparent`
+                        : `${option.bgColor} ${option.textColor} ${option.borderColor} ${option.hoverColor}`
+                      }`}
+                    style={{ fontFamily: 'Georgia, serif' }}
+                  >
+                    {option.text}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Buttons */}
+      <div className="w-full flex justify-between items-center pb-4 max-w-2xl">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-[#4A90E2] hover:text-[#4A90E2]/80 transition-colors text-base"
+          style={{ fontFamily: 'Georgia, serif' }}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Voltar
+        </button>
+
+        <FlowButton
+          text="Continuar"
+          disabled={selectedOptions.length === 0}
+          onClick={() => selectedOptions.length > 0 && onNext(selectedOptions)}
+        />
+      </div>
+    </div>
+  );
+}

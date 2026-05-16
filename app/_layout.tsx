@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useNavigationState } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
@@ -22,8 +23,11 @@ import {
   PlusJakartaSans_700Bold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 
+import { PostHogProvider } from 'posthog-react-native';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ModalProvider } from '@/contexts/ModalContext';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
+import { posthog } from '@/lib/posthog';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,6 +35,11 @@ function RootNavigator() {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const routeName = useNavigationState(state => {
+    if (!state) return null;
+    const route = state.routes[state.index];
+    return route?.name ?? null;
+  });
 
   usePushNotifications(session?.user?.id);
 
@@ -43,6 +52,10 @@ function RootNavigator() {
       router.replace('/(tabs)');
     }
   }, [session, loading]);
+
+  useEffect(() => {
+    if (routeName) posthog.screen(routeName);
+  }, [routeName]);
 
   if (loading) {
     return (
@@ -57,6 +70,7 @@ function RootNavigator() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+      <Stack.Screen name="pulse-break" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </Stack>
   );
 }
@@ -85,11 +99,15 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <ThemeProvider value={DefaultTheme}>
-        <StatusBar style="dark" />
-        <RootNavigator />
-      </ThemeProvider>
-    </AuthProvider>
+    <PostHogProvider client={posthog}>
+      <AuthProvider>
+        <ModalProvider>
+          <ThemeProvider value={DefaultTheme}>
+            <StatusBar style="dark" />
+            <RootNavigator />
+          </ThemeProvider>
+        </ModalProvider>
+      </AuthProvider>
+    </PostHogProvider>
   );
 }
