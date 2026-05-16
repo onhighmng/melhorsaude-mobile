@@ -25,6 +25,7 @@ import {
 
 import { PostHogProvider } from 'posthog-react-native';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { useCompanyGate } from '@/hooks/useCompanyGate';
 import { ModalProvider } from '@/contexts/ModalContext';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { posthog } from '@/lib/posthog';
@@ -33,6 +34,7 @@ SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { session, loading } = useAuth();
+  const { isOnHold, checking: gateChecking } = useCompanyGate();
   const segments = useSegments();
   const router = useRouter();
   const routeName = useNavigationState(state => {
@@ -44,14 +46,24 @@ function RootNavigator() {
   usePushNotifications(session?.user?.id);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || gateChecking) return;
     const inAuth = segments[0] === '(auth)';
+    const onHoldScreen = segments[0] === 'company-on-hold';
+
     if (!session && !inAuth) {
       router.replace('/(auth)/login');
     } else if (session && inAuth) {
+      if (isOnHold) {
+        router.replace('/company-on-hold');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } else if (session && isOnHold && !onHoldScreen) {
+      router.replace('/company-on-hold');
+    } else if (session && !isOnHold && onHoldScreen) {
       router.replace('/(tabs)');
     }
-  }, [session, loading]);
+  }, [session, loading, isOnHold, gateChecking]);
 
   useEffect(() => {
     if (routeName) posthog.screen(routeName);
@@ -71,6 +83,7 @@ function RootNavigator() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       <Stack.Screen name="pulse-break" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="company-on-hold" options={{ headerShown: false, gestureEnabled: false }} />
     </Stack>
   );
 }

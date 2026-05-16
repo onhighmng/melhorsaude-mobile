@@ -32,8 +32,12 @@ export function usePulse(userId: string | undefined) {
     const overall_score = Math.round((energy + humor + (6 - stress)) / 3);
     const { error } = await (supabase.from('pulse_logs') as any)
       .insert({ user_id: userId, energy, stress, humor, overall_score, notes: '' });
-    if (error) console.warn('[usePulse] save error:', error.message);
+    if (error) { console.warn('[usePulse] save error:', error.message); return; }
     await fetchLast();
+    // Fire-and-forget: analyze scores and trigger a break if needed
+    supabase.functions
+      .invoke('analyze-pulse-for-breaks', { body: { user_id: userId } })
+      .catch((err) => console.warn('[usePulse] analyze-pulse error:', err?.message));
   }, [userId, fetchLast]);
 
   useEffect(() => { fetchLast(); }, [fetchLast]);

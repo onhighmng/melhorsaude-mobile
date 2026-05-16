@@ -192,6 +192,9 @@ export default function BemEstarScreen() {
     track.moodLogged(moodId, moodIndex);
     setMoodSaved(true);
     setTimeout(() => setMoodSaved(false), 2000);
+    supabase.functions
+      .invoke('analyze-pulse-for-breaks', { body: { user_id: user.id } })
+      .catch(() => {});
   }, [user?.id]);
 
   const handleUrgentCall = useCallback(async () => {
